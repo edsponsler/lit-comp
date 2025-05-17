@@ -1,0 +1,4 @@
+#enter files and folders for git to ignore
+
+#always ignore the python virtual environment 
+.venv/
