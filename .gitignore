@@ -2,3 +2,6 @@
 
 #always ignore the python virtual environment 
 .venv/
+
+# Environment Variables and API Keys
+.env
