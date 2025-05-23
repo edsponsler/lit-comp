@@ -2,138 +2,149 @@
 from google.cloud import firestore
 import datetime
 import uuid
-from google.adk.tools import FunctionTool # [cite: 231]
-from typing import Optional
+from google.adk.tools import FunctionTool
+from typing import Optional, List, Dict, Any, Union # Ensure all necessary typing imports
+
+# Attempt to import DatetimeWithNanoseconds for robust type checking
+# This is often found in google.api_core.datetime_helpers
+try:
+    from google.api_core.datetime_helpers import DatetimeWithNanoseconds
+except ImportError:
+    print("Warning: DatetimeWithNanoseconds from google.api_core.datetime_helpers could not be imported. "
+          "The serialization logic will primarily rely on datetime.datetime checks.")
+    # Create a dummy class so isinstance check doesn't fail if import is missing
+    class DatetimeWithNanoseconds(object): pass
 
 # Initialize Firestore DB client
-# This will use Application Default Credentials or other configured credentials.
+db = None
 try:
-    db = firestore.Client() # [cite: 235]
+    db = firestore.Client()
 except Exception as e:
-    print(f"Failed to initialize Firestore client: {e}. Make sure your environment is authenticated.")
-    db = None
+    print(f"CRITICAL: Failed to initialize Firestore client: {e}. "
+          "Ensure your GCP project is set up and authenticated (gcloud auth application-default login).")
+    # Optionally, re-raise or exit if Firestore is critical for the module to function
+    # For now, functions will return an error if db is None.
 
-STATUS_BOARD_COLLECTION = "agent_status_board" # [cite: 235]
+STATUS_BOARD_COLLECTION = "agent_status_board"
+
+def _make_serializable(data: Any) -> Any:
+    """
+    Recursively converts datetime.datetime and DatetimeWithNanoseconds objects
+    in data to ISO 8601 strings for JSON serialization.
+    """
+    if isinstance(data, list):
+        return [_make_serializable(item) for item in data]
+    elif isinstance(data, dict):
+        return {key: _make_serializable(value) for key, value in data.items()}
+    # Check for DatetimeWithNanoseconds first if its class was successfully imported and is not the dummy
+    elif 'DatetimeWithNanoseconds' in globals() and DatetimeWithNanoseconds is not object and isinstance(data, DatetimeWithNanoseconds):
+        return data.isoformat()
+    # Then check for standard datetime.datetime (Firestore Timestamps usually convert to this)
+    elif isinstance(data, datetime.datetime):
+        return data.isoformat()
+    return data
 
 def update_status(
     agent_id: str,
     session_id: str,
     status: str,
     task_id: Optional[str] = None,
-    status_details: Optional[str] = None, # [cite: 237]
-    output_references: Optional[list] = None, # [cite: 237]
-    input_references: Optional[list] = None, # [cite: 237]
-    progress_metric: Optional[str] = None, # [cite: 237]
-    dependencies: Optional[list] = None # [cite: 237]
-) -> dict:
+    status_details: Optional[str] = None,
+    # output_references schema: Array of Strings/Objects [cite: 121]
+    output_references: Optional[List[Dict[str, Any]]] = None, # More specific: List of Dicts
+    # input_references schema: Array of Strings/Objects [cite: 120]
+    input_references: Optional[List[Dict[str, Any]]] = None, # More specific: List of Dicts
+    progress_metric: Optional[str] = None,
+    dependencies: Optional[List[str]] = None) -> Dict[str, Any]:
     """
-    Creates or updates an agent's status entry on the Firestore Agent Status Board. [cite: 237]
-    Args:
-        agent_id (str): Unique identifier of the agent. [cite: 237]
-        session_id (str): Identifier for the overall user session/report task. [cite: 237]
-        status (str): Current status of the agent/task (e.g., "processing_request", "completed_task"). [cite: 238]
-        task_id (str, optional): Unique identifier for the specific sub-task. [cite: 238]
-        status_details (str, optional): A brief natural language description of the current activity. [cite: 239]
-        output_references (list, optional): References to any output data produced. [cite: 240]
-        input_references (list, optional): References to any input data the agent is using. [cite: 240]
-        progress_metric (str, optional): Metric indicating progress (e.g., "3/5 sources processed"). [cite: 241]
-        dependencies (list, optional): Task_ids that this task depends on. [cite: 241]
-    Returns:
-        dict: A dictionary containing the success status and the ID of the entry. [cite: 242]
+    Creates or updates an agent's status entry on the Firestore Agent Status Board.
     """
     if not db:
-        return {"status": "error", "message": "Firestore client not initialized."} # [cite: 243]
+        return {"status": "error", "message": "Firestore client not initialized."}
 
-    print(f"--- Tool: update_status called by {agent_id} for session {session_id}, task {task_id} with status {status} ---") # [cite: 243]
+    print(f"--- Tool: update_status called by {agent_id} for session {session_id}, task {task_id} with status {status} ---")
 
-    # If task_id is provided, use it as the document ID for idempotency.
-    # Otherwise, generate a new unique ID for the entry.
-    entry_id = task_id if task_id else str(uuid.uuid4()) # [cite: 243]
-    doc_ref = db.collection(STATUS_BOARD_COLLECTION).document(entry_id) # [cite: 243]
+    entry_id = task_id if task_id else str(uuid.uuid4())
+    doc_ref = db.collection(STATUS_BOARD_COLLECTION).document(entry_id)
 
-    log_data = {
-        "timestamp": datetime.datetime.now(tz=datetime.timezone.utc), # [cite: 243]
-        "agent_id": agent_id, # [cite: 244]
-        "session_id": session_id, # [cite: 244]
-        "task_id": task_id, # This will be the actual task_id, or None if not provided initially [cite: 244]
-        "status": status, # [cite: 244]
-        "entry_id": entry_id # Store the document ID explicitly for easier reference
+    log_data: Dict[str, Any] = {
+        "timestamp": datetime.datetime.now(tz=datetime.timezone.utc), # Stored as Firestore Timestamp
+        "agent_id": agent_id,
+        "session_id": session_id,
+        "task_id": task_id,
+        "status": status,
+        "entry_id": entry_id
     }
-    if status_details:
-        log_data["status_details"] = status_details # [cite: 244]
-    if output_references:
-        log_data["output_references"] = output_references # [cite: 244]
-    if input_references:
-        log_data["input_references"] = input_references # [cite: 244]
-    if progress_metric:
-        log_data["progress_metric"] = progress_metric # [cite: 245]
-    if dependencies:
-        log_data["dependencies"] = dependencies # [cite: 245]
+    if status_details is not None:
+        log_data["status_details"] = status_details
+    if output_references is not None:
+        # These are assumed to be JSON-serializable as passed by the LLM/agent
+        log_data["output_references"] = output_references
+    if input_references is not None:
+        log_data["input_references"] = input_references
+    if progress_metric is not None:
+        log_data["progress_metric"] = progress_metric
+    if dependencies is not None:
+        log_data["dependencies"] = dependencies
 
     try:
-        # Use set with merge=True to create or update parts of the document.
-        # If entry_id is based on task_id, this will update the existing task status.
-        doc_ref.set(log_data, merge=True) # [cite: 245]
-        print(f"--- Tool: Status updated successfully for entry_id: {entry_id} (Task ID: {task_id}) ---") # [cite: 245]
-        return {"status": "success", "entry_id": entry_id, "message": "Status updated successfully."} # [cite: 245]
+        doc_ref.set(log_data, merge=True)
+        print(f"--- Tool: Status updated successfully for entry_id: {entry_id} (Task ID: {task_id}) ---")
+        return {"status": "success", "entry_id": entry_id, "message": "Status updated successfully."}
     except Exception as e:
-        print(f"--- Tool: Error updating status for entry_id {entry_id}: {e} ---") # [cite: 246]
-        return {"status": "error", "entry_id": entry_id, "message": str(e)} # [cite: 246]
+        print(f"--- Tool: Error updating status for entry_id {entry_id}: {e} ---")
+        return {"status": "error", "entry_id": entry_id, "message": str(e)}
 
-def get_status(session_id: str, task_id: Optional[str] = None, agent_id: Optional[str] = None) -> dict:
+
+def get_status(session_id: str, task_id: Optional[str] = None, agent_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Queries Firestore for the status of a specific task, all tasks for an agent in a session,
-    or all tasks in a session. [cite: 246]
-    Args:
-        session_id (str): Identifier for the overall user session. [cite: 247]
-        task_id (str, optional): Specific task_id to retrieve. If provided, agent_id is ignored. [cite: 248]
-                                 This assumes task_id was used as the document ID.
-        agent_id (str, optional): Specific agent_id to retrieve status for within the session. [cite: 249]
-    Returns:
-        dict: A dictionary containing query status and a list of matching status entries. [cite: 250]
+    or all tasks in a session. Returns JSON serializable data.
     """
     if not db:
-        return {"status": "error", "message": "Firestore client not initialized.", "results": []} # [cite: 251]
+        return {"status": "error", "message": "Firestore client not initialized.", "results": []}
 
-    print(f"--- Tool: get_status called for session {session_id}, task {task_id}, agent {agent_id} ---") # [cite: 251]
-
+    print(f"--- Tool: get_status called for session {session_id}, task {task_id}, agent {agent_id} ---")
     query = db.collection(STATUS_BOARD_COLLECTION)
 
+    results_to_serialize: List[Dict[str, Any]] = []
+
     if task_id:
-        # If task_id is provided, we assume it's the document ID.
-        doc_ref = query.document(task_id) # [cite: 251]
-        doc = doc_ref.get() # [cite: 251]
+        doc_ref = query.document(task_id)
+        doc = doc_ref.get()
         if doc.exists:
             entry = doc.to_dict()
-            # Ensure the retrieved document actually belongs to the requested session_id
-            if entry.get("session_id") == session_id: # [cite: 252]
-                print(f"--- Tool: Status retrieved for task_id: {task_id} ---") # [cite: 252]
-                return {"status": "success", "results": [entry]} # [cite: 252]
+            if entry and entry.get("session_id") == session_id: # Check if entry is not None
+                print(f"--- Tool: Status retrieved for task_id: {task_id} ---")
+                results_to_serialize.append(entry)
             else:
-                # Document with this task_id exists but for a different session
-                print(f"--- Tool: Task ID {task_id} found, but not for session {session_id} ---") # [cite: 253]
-                return {"status": "success", "results": [], "message": f"Task {task_id} not found in session {session_id}."} # [cite: 253]
+                print(f"--- Tool: Task ID {task_id} found, but not for session {session_id} or entry data is invalid ---")
+                # Return structure consistent with multiple results, even if empty or message
+                return {"status": "success", "results": [], "message": f"Task {task_id} not found in session {session_id} or entry data is invalid."}
         else:
-            print(f"--- Tool: No status entry found for task_id: {task_id} ---") # [cite: 253]
-            return {"status": "success", "results": [], "message": f"No status entry found for task_id: {task_id}."} # [cite: 253]
+            print(f"--- Tool: No status entry found for task_id: {task_id} ---")
+            return {"status": "success", "results": [], "message": f"No status entry found for task_id: {task_id}."}
+    else:
+        # If no specific task_id, query by session_id and optionally agent_id
+        query = query.where("session_id", "==", session_id)
+        if agent_id:
+            query = query.where("agent_id", "==", agent_id)
+        
+        try:
+            for doc_snap in query.order_by("timestamp", direction=firestore.Query.DESCENDING).stream():
+                if doc_snap.exists:
+                    results_to_serialize.append(doc_snap.to_dict())
+        except Exception as e:
+            print(f"--- Tool: Error querying status: {e} ---")
+            return {"status": "error", "message": str(e), "results": []}
 
-    # If task_id is not provided, filter by session_id and optionally agent_id
-    query = query.where("session_id", "==", session_id) # [cite: 251]
-    if agent_id:
-        query = query.where("agent_id", "==", agent_id) # [cite: 254]
+    serializable_results = _make_serializable(results_to_serialize)
+    print(f"--- Tool: Found {len(serializable_results)} status entries for session {session_id}, agent {agent_id or 'any'} ---")
+    return {"status": "success", "results": serializable_results}
 
-    try:
-        # Order by timestamp to get the most recent updates first if querying multiple entries
-        results = [doc.to_dict() for doc in query.order_by("timestamp", direction=firestore.Query.DESCENDING).stream()] # [cite: 254]
-        print(f"--- Tool: Found {len(results)} status entries for session {session_id}, agent {agent_id or 'any'} ---") # [cite: 254]
-        return {"status": "success", "results": results} # [cite: 254]
-    except Exception as e:
-        print(f"--- Tool: Error getting status: {e} ---") # [cite: 254]
-        return {"status": "error", "message": str(e), "results": []} # [cite: 254]
 
 # Create ADK FunctionTool instances
 status_board_updater_tool = FunctionTool(update_status)
-
 status_board_reader_tool = FunctionTool(get_status)
 
-print("StatusBoardTool (updater and reader) defined.") # [cite: 256]
+print("StatusBoardTool (updater and reader) defined with Optional typing and datetime serialization.")
