@@ -80,7 +80,7 @@ def update_status(
         print(f"--- Tool: Error updating status for entry_id {entry_id}: {e} ---") # [cite: 246]
         return {"status": "error", "entry_id": entry_id, "message": str(e)} # [cite: 246]
 
-def get_status(session_id: str, task_id: str = None, agent_id: Optional[str] = None) -> dict:
+def get_status(session_id: str, task_id: Optional[str] = None, agent_id: Optional[str] = None) -> dict:
     """
     Queries Firestore for the status of a specific task, all tasks for an agent in a session,
     or all tasks in a session. [cite: 246]
