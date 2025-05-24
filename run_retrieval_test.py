@@ -50,25 +50,64 @@ async def test_retrieval_agent():
     # Simulate a task from the Coordinator, including session_id and task_id in the query
     # as per the agent's instructions.
     user_query = ( # [cite: 270]
-        f"Please find information on 'the future of renewable energy'. " # [cite: 271]
+        f"Please find information on 'future of multi-agent system research inspired by Minsky's Society of Mind'. " # [cite: 271]
         f"Use session_id: {current_session_id} and task_id: {current_task_id} for status updates." # [cite: 271]
     )
     print(f"\n>>> Sending task to InformationRetrievalSpecialist: {user_query}") # [cite: 271]
 
     # Create the message content
     content = genai_types.Content(role='user', parts=[genai_types.Part(text=user_query)]) # [cite: 271]
-
-    final_response_text = "Agent did not produce a final response." # [cite: 271]
-    async for event in runner_retrieval.run_async( # [cite: 271]
-        user_id=user_id_retrieval, 
-        session_id=current_session_id, 
+    
+    final_response_text = "Agent did not produce a final response."
+    print("\n--- Iterating through agent events ---")
+    event_count = 0
+    async for event in runner_retrieval.run_async(
+        user_id=user_id_retrieval,
+        session_id=current_session_id,
         new_message=content
     ):
-        if event.is_final_response(): # [cite: 272]
-            if event.content and event.content.parts: # [cite: 272]
-                final_response_text = event.content.parts[0].text # [cite: 272]
-            break
+        event_count += 1
+        print(f"\n--- Event {event_count} ---")
+        print(f"Type: {type(event)}")
+        if hasattr(event, 'app_name'): print(f"App Name: {event.app_name}")
+        if hasattr(event, 'user_id'): print(f"User ID: {event.user_id}")
+        if hasattr(event, 'session_id'): print(f"Session ID: {event.session_id}")
+        if hasattr(event, 'turn_id'): print(f"Turn ID: {event.turn_id}")
+        if hasattr(event, 'agent_id'): print(f"Agent ID: {event.agent_id}")
+        
+        if event.content and event.content.parts:
+            print(f"Content Parts ({len(event.content.parts)}):")
+            for i, part in enumerate(event.content.parts):
+                print(f"  Part {i+1}:")
+                if hasattr(part, 'text') and part.text:
+                    print(f"    Text: \"{part.text.strip()}\"")
+                if hasattr(part, 'function_call') and part.function_call:
+                    fc = part.function_call
+                    print(f"    Function Call: {fc.name}")
+                    # Be careful logging fc.args if they are very large
+                    args_str = str(fc.args)
+                    if len(args_str) > 300: # Truncate large args for printing
+                        args_str = args_str[:300] + "... (truncated)"
+                    print(f"    Args: {args_str}")
+                if hasattr(part, 'function_result') and part.function_result:
+                    fr = part.function_result
+                    print(f"    Function Result: {fr.name}")
+                    # Be careful logging fr.response if it's very large
+                    response_str = str(fr.response)
+                    if len(response_str) > 300: # Truncate large response for printing
+                        response_str = response_str[:300] + "... (truncated)"
+                    print(f"    Response: {response_str}")
 
+        if event.is_final_response():
+            print(">>> This event IS the final response from the agent. <<<")
+            if event.content and event.content.parts and event.content.parts[0].text:
+                final_response_text = event.content.parts[0].text
+            break 
+        else:
+            print("--- This event is NOT the final response. ---")
+
+    print(f"\nLoop finished. Total events processed: {event_count}")
+    
     print(f"<<< InformationRetrievalSpecialist Response: {final_response_text}") # [cite: 272]
 
     # Check Firestore for status updates using the reader tool

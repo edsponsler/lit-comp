@@ -32,7 +32,7 @@ async def test_coordinator_level_1():
     print(f"Runner created for agent '{runner_coordinator.agent.name}'.")
 
     user_query_text = (
-        f"User Query: Generate a report on 'key advancements in quantum computing in the last year'. "
+        f"User Query: Generate a report on 'the future of multi-agent system research inspired by Minsky's Society of Mind'. "
         f"Please use session_id: {current_session_id} for all your operations."
     )
     
