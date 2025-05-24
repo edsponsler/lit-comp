@@ -1,7 +1,15 @@
-#enter files and folders for git to ignore
-
-#always ignore the python virtual environment 
+# Virtual environment
 .venv/
 
-# Environment Variables and API Keys
+# Environment variables
 .env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE and OS specific
+.vscode/
+.DS_Store
