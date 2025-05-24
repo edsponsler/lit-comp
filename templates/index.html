@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIE Web Interface</title>
+    <style>
+         body { font-family: sans-serif; margin: 20px; }
+         #query { width: 80%; padding: 10px; margin-bottom: 10px; } /* [cite: 40, 41] */
+         #submitBtn { padding: 10px 15px; } /* [cite: 41, 42] */
+         #result { margin-top: 20px; border: 1px solid #ccc; padding: 15px; background-color: #f9f9f9; } /* [cite: 42, 43] */
+     </style>
+</head>
+<body>
+    <h1>Collaborative Insight Engine</h1>
+    <textarea id="query" rows="3" placeholder="Enter your research topic..."></textarea><br>
+    <button id="submitBtn">Get Report</button>
+    <div id="result">
+        </div>
+    <script>
+         document.getElementById('submitBtn').addEventListener('click', async () => {
+             const queryText = document.getElementById('query').value;
+             const resultDiv = document.getElementById('result');
+             resultDiv.innerHTML = 'Processing... please wait.'; /* [cite: 44] */
+
+             try {
+                 const response = await fetch('/process_query', { /* [cite: 4] */
+                     method: 'POST',
+                     headers: {
+                         'Content-Type': 'application/json' /* [cite: 45] */
+                    },
+                     body: JSON.stringify({ query: queryText })
+                 });
+
+                 if (!response.ok) { /* [cite: 46] */
+                     const errorData = await response.json(); /* [cite: 46] */
+                     throw new Error(errorData.error || `HTTP error! status: ${response.status}`); /* [cite: 46, 47] */
+                 }
+
+                 const data = await response.json(); /* [cite: 48] */
+                 resultDiv.innerHTML = data.report; /* [cite: 5, 48] */
+             } catch (error) {
+                 console.error('Error:', error); /* [cite: 49] */
+                 resultDiv.innerHTML = `<p style="color: red;">Error processing your request: ${error.message}</p>`; /* [cite: 50] */
+             }
+         });
+     </script>
+</body>
+</html>
