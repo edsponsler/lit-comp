@@ -1,0 +1,13 @@
+# ~/projects/cie-0/.dockerignore
+Dockerfile
+.dockerignore
+.git
+.gitignore
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.vscode/
+.DS_Store
+*.md

@@ -3,47 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CIE Web Interface</title>
+    <title>CIE Report Generator</title>
     <style>
-         body { font-family: sans-serif; margin: 20px; }
-         #query { width: 80%; padding: 10px; margin-bottom: 10px; } /* [cite: 40, 41] */
-         #submitBtn { padding: 10px 15px; } /* [cite: 41, 42] */
-         #result { margin-top: 20px; border: 1px solid #ccc; padding: 15px; background-color: #f9f9f9; } /* [cite: 42, 43] */
-     </style>
+         body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; } /* [cite: 13, 14] */
+         .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); } /* [cite: 14, 15] */
+         textarea { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; } /* [cite: 15, 16] */
+         button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; } /* [cite: 17, 18] */
+         button:hover { background-color: #0056b3; } /* [cite: 18] */
+         #results { margin-top: 20px; padding: 15px; border: 1px solid #eee; border-radius: 4px; background-color: #f9f9f9; white-space: pre-wrap; } /* [cite: 19, 20] */ /* pre-wrap helps render Markdown-like text */ /* [cite: 20] */
+        .loading { font-style: italic; color: #777; } /* [cite: 20, 21] */
+    </style>
 </head>
 <body>
-    <h1>Collaborative Insight Engine</h1>
-    <textarea id="query" rows="3" placeholder="Enter your research topic..."></textarea><br>
-    <button id="submitBtn">Get Report</button>
-    <div id="result">
+    <div class="container">
+        <h1>Collaborative Insight Engine</h1>
+        <form id="queryForm">
+            <textarea id="searchQuery" name="query" rows="3" placeholder="Enter your report topic..."></textarea>
+            <button type="submit">Generate Report</button>
+        </form>
+        <h2>Report:</h2>
+        <div id="results">
+             <p>Your report will appear here.</p> /* [cite: 22] */
         </div>
+    </div>
     <script>
-         document.getElementById('submitBtn').addEventListener('click', async () => {
-             const queryText = document.getElementById('query').value;
-             const resultDiv = document.getElementById('result');
-             resultDiv.innerHTML = 'Processing... please wait.'; /* [cite: 44] */
-
+         document.getElementById('queryForm').addEventListener('submit', async function(event) {
+             event.preventDefault();
+             const query = document.getElementById('searchQuery').value;
+             const resultsDiv = document.getElementById('results');
+             resultsDiv.innerHTML = '<p class="loading">Generating report, please wait...</p>'; /* [cite: 22, 23] */
              try {
-                 const response = await fetch('/process_query', { /* [cite: 4] */
+                 const response = await fetch('/process', {
                      method: 'POST',
                      headers: {
-                         'Content-Type': 'application/json' /* [cite: 45] */
-                    },
-                     body: JSON.stringify({ query: queryText })
+                         'Content-Type': 'application/json', /* [cite: 24] */
+                     },
+                     body: JSON.stringify({ query: query }),
                  });
-
-                 if (!response.ok) { /* [cite: 46] */
-                     const errorData = await response.json(); /* [cite: 46] */
-                     throw new Error(errorData.error || `HTTP error! status: ${response.status}`); /* [cite: 46, 47] */
+                 if (!response.ok) { /* [cite: 25] */
+                     const errorData = await response.json(); /* [cite: 25] */
+                     throw new Error(errorData.message || `HTTP error! status: ${response.status}`); /* [cite: 26] */
                  }
-
-                 const data = await response.json(); /* [cite: 48] */
-                 resultDiv.innerHTML = data.report; /* [cite: 5, 48] */
+                 const data = await response.json(); /* [cite: 26] */
+                // If using Marked.js: resultsDiv.innerHTML = marked.parse(data.report); /* [cite: 27] */
+                // For plain text rendering of Markdown: /* [cite: 27] */
+                resultsDiv.innerText = data.report; /* [cite: 27] */
              } catch (error) {
-                 console.error('Error:', error); /* [cite: 49] */
-                 resultDiv.innerHTML = `<p style="color: red;">Error processing your request: ${error.message}</p>`; /* [cite: 50] */
+                 resultsDiv.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`; /* [cite: 28] */
+                 console.error('Error processing request:', error); /* [cite: 29] */
              }
          });
-     </script>
+    </script>
 </body>
 </html>
