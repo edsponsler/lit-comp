@@ -91,7 +91,8 @@ sudo apt install snapd
 ```bash  
 sudo snap install google-cloud-cli --classic  
 ```
-   Start a new WSL terminal session to ensure Snap paths are loaded correctly.  
+   Start a new WSL terminal session to ensure Snap paths are loaded correctly. 
+
 3. Authenticate gcloud:  
 ```bash  
 gcloud auth login
@@ -228,7 +229,8 @@ The CoordinatorAgent orchestrates the specialist agents.
 
 ### Implementing the CoordinatorAgent
 
-The CoordinatorAgent uses specialist agents as tools via the AgentTool wrapper.  
+The CoordinatorAgent uses specialist agents as tools via the AgentTool wrapper. 
+
 Create/Update the CoordinatorAgent (agents/coordinator_agent.py). This agent's prompt outlines a multi-phase plan: initial setup, information retrieval, data analysis, report formatting, and final delivery, detailing how to delegate tasks to specialists, pass session_id and sub-task task_ids, check their status using the status_board_reader_tool, and process their output_references.
 
 * **Special Note on AgentTool Usage**: For google-adk==0.5.0, AgentTool is imported from google.adk.tools.agent_tool and instantiated with AgentTool(agent=specialist_agent_instance).  
@@ -373,7 +375,7 @@ gcloud run deploy "${SERVICE_NAME}" \
       --project="${PROJECT_ID}"
 ```
    * **Special Note on Cloud Run Resources**: Cloud Run services may need more than default memory (512MiB). Monitor logs for "out of memory" errors and adjust \--memory (e.g., 1Gi, 2Gi) and \--cpu.  
-9. **Assign IAM Roles to the Cloud Run Service Account**:  
+9. Assign IAM Roles to the Cloud Run Service Account:  
    * Once deployed, find the service account your Cloud Run service uses (in GCP Console under Cloud Run service details).  
    * Grant this service account these roles:  
      * "Cloud Datastore User" (for Firestore)  
