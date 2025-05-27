@@ -30,4 +30,5 @@ ENV GOOGLE_GENAI_USE_VERTEXAI=TRUE
 # CUSTOM_SEARCH_API_KEY, CUSTOM_SEARCH_ENGINE_ID will be set in Cloud Run.
 
 # Run app.py when the container launches using Gunicorn
+# CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--timeout", "180", "app:app"]
 CMD exec gunicorn --bind 0.0.0.0:$PORT --timeout 180 app:app

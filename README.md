@@ -305,10 +305,21 @@ gunicorn
 
 1. Create Dockerfile:  
    Create the Dockerfile.  
-   * **Special Note on CMD instruction**: The CMD instruction in the Dockerfile must use the shell form (e.g., CMD exec gunicorn ...) or an entrypoint script for the $PORT environment variable to be correctly expanded. The array / exec form \(e.g., \[\"gunicorn\", ..., \"0.0.0.0:\${PORT}\", ...\]\) might cause Gunicorn to see ${PORT} literally.
+   * **Special Note on CMD instruction**: The CMD instruction in the Dockerfile must use the shell form (e.g., CMD exec gunicorn ...) or an entrypoint script for the $PORT environment variable to be correctly expanded. 
+
+The array / exec form:
+```bash
+CMD ["gunicorn", "--bind", "0.0.0.0:${PORT}", "--timeout", "180", "app:app"]
+```
+might cause Gunicorn to see ${PORT} literally. 
+
+Instead use:
+```bash
+CMD exec gunicorn --bind 0.0.0.0:$PORT --timeout 180 app:app
+```
 
    * **Special Note on Gunicorn Timeout**: Gunicorn's default worker timeout (30 seconds) can be too short for the CIE's processing. Adding \--timeout 180 (or a suitable value) to the gunicorn command in the Dockerfile is crucial for longer-running queries.  
-2. Create .dockerignore file:  
+1. Create .dockerignore file:  
    Create the .dockerignore file to exclude unnecessary files (like .venv, \_\_pycache\_\_) from the Docker image, keeping it small and build times faster.
 
 ### Step 5.5: Deploying to Google Cloud Run
