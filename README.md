@@ -1,5 +1,7 @@
 # Collaborative Insight Engine (CIE) Core & Web UI Deployment
 
+See also [Wiki](https://github.com/edsblog/cie-adk-tutorial/wiki)
+
 Welcome to the Collaborative Insight Engine (CIE) project\! This README provides a comprehensive guide to understanding, setting up, building, and deploying the CIE. The CIE is a multi-agent system designed to automate the process of gathering, analyzing, and synthesizing information on a given topic to produce a concise report. This document will walk you through setting up the core CIE functionality and then deploying a web user interface for it on Google Cloud Run.
 
 This project is useful for developers looking to explore multi-agent systems, automate research tasks, or build sophisticated information processing pipelines. By following this guide, you'll have a functional CIE system accessible via a web UI.
