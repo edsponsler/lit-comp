@@ -1,4 +1,4 @@
-# ~/projects/cie-0/run_coordinator_level_1_test.py
+# ~/projects/cie-0/run_coordinator_test.py
 import asyncio
 import uuid
 import os
@@ -11,10 +11,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-async def test_coordinator_level_1():
+async def cie_coordinator_test():
     session_service_coordinator = InMemorySessionService()
     app_name_coordinator = "cie_coordinator_test_app"
-    user_id_coordinator = "test_user_coordinator"
+    user_id_coordinator = "cie_coordinator_test_user"
     current_session_id = f"session_{str(uuid.uuid4())}"
     
     session_service_coordinator.create_session(
@@ -22,7 +22,7 @@ async def test_coordinator_level_1():
         user_id=user_id_coordinator,
         session_id=current_session_id
     )
-    print(f"Test session created for Coordinator: {current_session_id}")
+    print(f"Test session created for Coordinator Agent: {current_session_id}")
 
     runner_coordinator = Runner(
         agent=coordinator_agent,
@@ -32,15 +32,15 @@ async def test_coordinator_level_1():
     print(f"Runner created for agent '{runner_coordinator.agent.name}'.")
 
     user_query_text = (
-        f"User Query: Generate a report on 'the future of multi-agent system research inspired by Minsky's Society of Mind'. "
+        f"User Query: Generate a report on 'Emergent Intelligence research inspired by Marvin Minsky's theory 'Society of Mind'. "
         f"Please use session_id: {current_session_id} for all your operations."
     )
     
-    print(f"\n>>> Sending task to CoordinatorAgent: {user_query_text}")
+    print(f"\n>>> Sending task to Coordinator Agent: {user_query_text}")
     
     initial_content = genai_types.Content(role='user', parts=[genai_types.Part(text=user_query_text)])
     
-    final_response_text = "CoordinatorAgent did not produce a final response."
+    final_response_text = "Coordinator Agent did not produce a final response."
     
     print("\n--- Iterating through agent events ---")
     
@@ -73,9 +73,9 @@ async def test_coordinator_level_1():
         
         i += 1
 
-    print(f"\n<<< CoordinatorAgent Final Response: {final_response_text}")
+    print(f"\n<<< Coordinator Agent Final Response: {final_response_text}")
 
-    print("\n--- Checking Status Board for updates (directly from script) ---")
+    print("\n--- Checking Agent Status Board for updates (directly from script) ---")
     try:
         status_check_all_session = get_status_from_board(session_id=current_session_id)
         print(f"All Statuses for session {current_session_id}:")
@@ -95,4 +95,4 @@ if __name__ == "__main__":
     project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
     if not project_id:
         print("Warning: GOOGLE_CLOUD_PROJECT environment variable not set. Firestore client might fail.")
-    asyncio.run(test_coordinator_level_1())
+    asyncio.run(cie_coordinator_test())
