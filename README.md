@@ -113,7 +113,7 @@ gcloud auth application-default login
 2. You'll also need a [Custom Search Engine ID](https://support.google.com/programmable-search/answer/12499034?hl=en) from the Programmable Search Engine control panel after creating a search engine.  
 3. Open Project in VS Code:  
 ```bash  
-cd \~/projects/cie-0  
+cd ~/projects/cie-0  
 code .
 ```
 4. Create a .env file in the root of your cie-0 project directory:  
@@ -149,13 +149,13 @@ __pycache__/
 
 ### Step 0.7: Project File Structure
 
-In your ~/projects/cie-0 directory, create the agents and tools directories and initialize them as Python packages:
+In your project's root directory (e.g., ~/projects/cie-0), create the agents and tools directories and initialize them as Python packages:
 
 ```bash
 mkdir agents  
 mkdir tools  
-touch agents/\_\_init\_\_.py  
-touch tools/\_\_init\_\_.py
+touch agents/__init__.py  
+touch tools/__init__.py
 ```
 ### Step 0.8: Initialize Git Repository (Optional)
 
@@ -163,17 +163,17 @@ touch tools/\_\_init\_\_.py
 ```bash  
 git init  
 git add .  
-git commit \-m "Initial project setup for CIE Core"
+git commit -m "Initial project setup for CIE Core"
 ```
 2. Create a corresponding empty repository on your Git provider (e.g., GitHub).  
 3. Link and push:  
 ```bash  
-git remote add origin \<your\_remote\_repository\_ssh\_or\_https\_url\>  
-git push \-u origin main
+git remote add origin <your_remote_repository_ssh_or_https_url>  
+git push -u origin main
 ```
 ### Step 0.9: Verify Firestore Setup
 
-Create and run the Firestore Test Script (test_firestore.py) to confirm your connection.
+Create and run the Firestore Test Script [test_firestore.py](./test_firestore.py) in your project's root directory to confirm your connection.
 
 ```bash
 python test_firestore.py
@@ -184,86 +184,88 @@ Confirm successful connection and data read/write. If you encounter errors, chec
 
 This section covers the creation of the fundamental tools and specialist agents for the CIE.
 
-### Step 1.1: Implement the StatusBoardTool
+### Step 1.1: Implement the Agent Status Board Tool
 
 This tool allows agents to communicate and coordinate by reading from and writing to a shared "Agent Status Board" in Firestore.  
 
-Create the StatusBoardTool (tools/status_board_tool.py). This script includes functions to update_status and get_status from Firestore, along with a helper _make_serializable to handle datetime objects.
+Create the Agent Status Board as [tools/status_board_tool.py](./tools/status_board_tool.py). This script creates two ADK FunctionTool instances: status_board_updater_tool is initialized with the update_status function and status_board_reader_tool is initialized with the get_status function. These functions update and get status messages from Firestore, along with a helper _make_serializable to handle datetime objects.
 
 * **Special Note on Datetime Serialization**: Firestore Timestamp objects (or datetime.datetime) are not directly JSON serializable. They need conversion (e.g., to ISO 8601 string using .isoformat()) if they are part of a tool's return data that the ADK will process. The _make_serializable function handles this.  
 * **Special Note on Optional Typing**: Use typing.Optional\[Type\] for optional arguments in functions wrapped by FunctionTool with google-adk==0.5.0 to avoid ADK parsing errors.
 
-### Step 1.2: Implement the Real Search Tool with Web Scraping
+### Step 1.2: Implement the Web Scraping Search Tool
 
 This tool uses the Google Custom Search API and scrapes basic content from web pages. Ensure requests and beautifulsoup4 are installed, and your API keys are in the .env file.  
 
-Create/Update the Search Tool (tools/search_tools.py). This script defines simple_web_search which queries the Google API, fetches pages, and uses BeautifulSoup to extract text from \<p\> tags, with error handling and content truncation.
+Create the Web Scraping Search Tool as [tools/search_tools.py](./tools/search_tools.py). This script defines simple_web_search which queries the Google API, fetches pages, and uses BeautifulSoup to extract text from \<p\> tags, with error handling and content truncation. An ADK FuntionTool instance named search_tool is initialized with the simple_web_search function. 
 
-### Step 1.3: Implement the InformationRetrievalSpecialist Agent
+### Step 1.3: Implement the Information Retrieval Specialist Agent
 
-This agent uses the search_tool to find information and updates its status using the status_board_updater_tool.  
+This agent uses the search_tool to find information and updates its status to the Agent Status Board using the status_board_updater_tool.  
 
-Create/Update the InformationRetrievalSpecialist Agent (agents/information_retrieval_specialist.py). Its prompt guides it to acknowledge tasks, use the search tool, and report results (including output_references) or errors to the status board, ensuring session_id and task_id are used correctly.
+Create the Information Retrieval Specialist Agent as [agents/information_retrieval_specialist.py](./agents/information_retrieval_specialist.py). Its prompt guides it to acknowledge tasks, use the search_tool, and report results (including output_references) or errors to the Agent Status Board, ensuring session_id and task_id are used correctly.
 
-### Step 1.4: Implement the DataAnalysisSpecialist Agent
+### Step 1.4: Implement the Data Analysis Specialist Agent
 
-This agent processes data retrieved by the InformationRetrievalSpecialist.  
-Create the DataAnalysisSpecialist Agent (agents/data_analysis_specialist.py). Its prompt instructs it to analyze provided text, extract insights, and update the status board with structured findings in output_references.
+This agent processes data retrieved by the Information Retrieval Specialist Agent.  
 
-### Step 1.5: Implement the ReportFormattingSpecialist Agent
+Create the Data Analysis Specialist Agent as [agents/data_analysis_specialist.py](./agents/data_analysis_specialist.py). Its prompt instructs it to analyze provided text, extract insights, and update the Agent Status Board with structured findings in output_references.
 
-This agent takes analyzed data and structures it into a final report.  
-Create the ReportFormattingSpecialist Agent (agents/report_formatting_specialist.py). Its prompt details how to review analyzed data and formatting instructions, organize the information, write the report (typically in Markdown), and update the status board with the formatted report in output_references.
+### Step 1.5: Implement the Report Formatting Specialist Agent
 
-## Part 2: Testing and Refining the InformationRetrievalSpecialist
+This agent takes analyzed data and structures it into a final report.
 
-With the real search tool and InformationRetrievalSpecialist defined, test them together.
+Create the Report Formatting Specialist Agent as [agents/report_formatting_specialist.py](./agents/report_formatting_specialist.py). Its prompt details how to review analyzed data and formatting instructions, organize the information, write the report in Markdown, and update the Agent Status Board with the formatted report in output_references.
 
-### Basic Interaction Test
+## Part 2: Testing and Refining the Information Retrieval Specialist
 
-Use the Retrieval Test Script (run_retrieval_test.py) to directly test the InformationRetrievalSpecialist. This script sets up a runner, sends a query, iterates through agent events, and checks the status board.
+With the Web Scraping Search Tool and Information Retrieval Specialist Agent defined, test them together.
+
+### Basic Interaction Test using the Retrieval Test Script
+
+Create and use the Retrieval Test Script as [run_retrieval_test.py](./run_retrieval_test.py) to directly test the Information Retrieval Specialist Agent. This script sets up a runner, sends a query, iterates through agent events, and checks the Agent Status Board.
 
 **Special Note on Content Length & Search Results**: Iterative testing with this script helps determine reliable settings for NUM_SEARCH_RESULTS and MAX_CONTENT_LENGTH in search_tools.py. A balance of NUM_SEARCH_RESULTS = 3 and MAX_CONTENT_LENGTH = 1500 characters was found to be stable. Remember that MAX_CONTENT_LENGTH is a character limit; 1500 characters is roughly 200-250 words.
 
-## Part 3: Implementing and Refining the CoordinatorAgent
+## Part 3: Implementing and Refining the Coordinator Agent
 
-The CoordinatorAgent orchestrates the specialist agents.
+The Coordinator Agent orchestrates the specialist agents.
 
-### Implementing the CoordinatorAgent
+### Implementing the Coordinator Agent
 
-The CoordinatorAgent uses specialist agents as tools via the AgentTool wrapper. 
+The Coordinator Agent uses specialist agents as tools via the AgentTool wrapper. 
 
-Create/Update the CoordinatorAgent (agents/coordinator_agent.py). This agent's prompt outlines a multi-phase plan: initial setup, information retrieval, data analysis, report formatting, and final delivery, detailing how to delegate tasks to specialists, pass session_id and sub-task task_ids, check their status using the status_board_reader_tool, and process their output_references.
+Create the Coordinator Agent as [agents/coordinator_agent.py](./agents/coordinator_agent.py). This agent's prompt outlines a multi-phase plan: initial setup, information retrieval, data analysis, report formatting, and final delivery, detailing how to delegate tasks to specialists, pass session_id and sub-task task_ids, check their status using the status_board_reader_tool, and process their output_references.
 
 * **Special Note on AgentTool Usage**: For google-adk==0.5.0, AgentTool is imported from google.adk.tools.agent_tool and instantiated with AgentTool(agent=specialist_agent_instance).  
-* **Special Note on Explicit ID Passing**: For multi-agent coordination where sub-tasks need tracking, the orchestrating agent (Coordinator) must be explicitly prompted to embed session_id and unique sub-task task_ids into the request string it sends to specialist agents. Specialists must then be prompted to use these exact IDs for their status updates.  
-* **Special Note on get_status Loop / Conditional Logic**: The CoordinatorAgent's initial problem of getting stuck in a get_status loop was resolved by restructuring its prompt. The new logic instructs the Coordinator to call get_status once ("Attempt 1"), explicitly examine the returned dictionary (checking results list, specialist's status field, and validity of output_references). If the task is completed and output is valid, it proceeds. If still processing, it makes only ONE MORE get_status call ("Attempt 2"). If not complete after the second check, it assumes an issue and proceeds, noting the problem. This "inspect and decide with bounded retry" logic is crucial.  
+* **Special Note on Explicit ID Passing**: For multi-agent coordination where sub-tasks need tracking, the orchestrating agent (Coordinator Agent) must be explicitly prompted to embed session_id and unique sub-task task_ids into the request string it sends to specialist agents. Specialists must then be prompted to use these exact IDs for their status updates.  
+* **Special Note on get_status Loop / Conditional Logic**: Initially, the Coordinator Agent got stuck in a get_status loop which was resolved by restructuring its prompt. The new logic instructs the Coordinator to call get_status once ("Attempt 1") and explicitly examine the returned dictionary (checking results list, specialist's status field, and validity of output_references). If the task is completed and output is valid, it proceeds. If still processing, it makes only ONE MORE get_status call (see for example step P1_4b of the Coordinator Agent's instruction prompt). If not complete after the second check, it assumes an issue and proceeds, noting the problem. This "inspect and decide with bounded retry" logic is crucial.  
 * **Special Note on ADK Instruction Templating**: Be cautious with literal curly braces {} in agent instruction strings, as the ADK might interpret them for variable substitution, potentially causing KeyError. Rephrasing or ensuring reliable escaping is necessary. F-strings in Python code constructing the prompt are safe.  
 * **Special Note on Pydantic Validation**: The ADK uses Pydantic, and its ValidationError messages are very helpful for debugging tool and agent definitions.
 
-## Part 4: Full System Test (CIE Core)
+## Part 4: Full System Test (CIE Coordinator Test)
 
-This script tests the entire CIE workflow, orchestrated by the CoordinatorAgent.
+Create [run_cie_coordinator_test.py](./run_cie_coordinator_test.py) to test the entire CIE Core workflow, orchestrated by the Coordinator Agent.
 
 ### Running the Full Pipeline
 
-Use the to test the full pipeline. This script initializes a session, sends a query to the CoordinatorAgent, and logs events and the final report, followed by a status board check.
+Run run_cie_coordinator_test.py in your project's root directory to test the full pipeline. This script initializes a session, sends a query to the Coordinator Agent, and logs events and the final report, followed by a Agent Status Board check. 
 
 ### Expected Outcome
 
 When executed, you should observe:
 
-* The CoordinatorAgent initiates, creates a main task ID, and updates its status.  
+* The Coordinator Agent initiates, creates a main task ID, and updates its status.  
 * It delegates to specialists, passing correct session_id and sub-task task_ids.  
 * Specialists use these IDs for their status updates and populate output_references.  
-* The CoordinatorAgent retrieves these outputs without looping.  
+* The Coordinator Agent retrieves these outputs without endlessly looping.  
 * This pattern repeats for all specialists.  
 * A final report based on processed data is delivered.  
-* The status board shows distinct, correctly ID'd entries for all agents. This signifies a correctly functioning core CIE multi-agent system.
+* The Agent Status Board shows distinct, correctly ID'd entries for all agents. This signifies a correctly functioning the CIE Core multi-agent system.
 
 ## Part 5: Deploying the CIE Web UI to Google Cloud Run
 
-This section guides you through deploying a Flask-based web UI for your CIE to Google Cloud Run.
+This section guides you through deploying a Flask-based web UI for the CIE Core to Google Cloud Run.
 
 ### Step 5.1: Web Application Setup (Flask)
 
@@ -274,7 +276,7 @@ pip install Flask[async] gunicorn
 ```
    * **Special Note on Flask\[async\]**: Flask\[async\] is required because the /process route in app.py is an async def function. Installing this prevents runtime errors.  
 2. Update Project Structure for Web UI:  
-   Create the following new files and directory within ~/projects/cie-0:  
+   Create the following new files and directory within your project's root folder (e.g., ~/projects/cie-0):  
 ```plaintext
 app.py
 requirements.txt
@@ -295,12 +297,12 @@ gunicorn
 ```
 ### Step 5.2: Building the User Interface
 
-1. Create templates/index.html: Populate templates/index.html with HTML, CSS, and JavaScript to create a form for user queries and a display area for the report.  
+1. Create [templates/index.html](./templates/index.html): Populate templates/index.html with HTML, CSS, and JavaScript to create a form for user queries and a display area for the report.  
    * **Special Note on JavaScript**: The JavaScript in this file handles form submission, sends an asynchronous request to the /process backend endpoint, and displays the report or errors.
 
 ### Step 5.3: Backend Logic for CIE Integration (Flask app.py)
 
-1. Create app.py: Populate app.py with the Flask application code. This script initializes Flask, serves index.html at the root route, and defines an async def process_query() route at /process to interact with the CoordinatorAgent and return the report as JSON, including error handling.  
+1. Create [app.py](./app.py): Populate app.py with the provided Flask application code. This script initializes Flask, serves index.html at the root route, and defines an async def process_query() route at /process to interact with the Coordinator Agent and return the report as JSON, including error handling.  
    * **Special Note on async def routes**: The async def route enables asynchronous operations with the ADK's Runner.run_async method.
 
 ### Step 5.4: Preparing for Deployment (Docker)
@@ -322,7 +324,7 @@ CMD exec gunicorn --bind 0.0.0.0:$PORT --timeout 180 app:app
 
    * **Special Note on Gunicorn Timeout**: Gunicorn's default worker timeout (30 seconds) can be too short for the CIE's processing. Adding \--timeout 180 (or a suitable value) to the gunicorn command in the Dockerfile is crucial for longer-running queries.  
 1. Create .dockerignore file:  
-   Create the .dockerignore file to exclude unnecessary files (like .venv, \_\_pycache\_\_) from the Docker image, keeping it small and build times faster.
+   Create the .dockerignore file to exclude unnecessary files (like .venv, \_\_pycache\_\_) from the Docker image, keeping it small and build times faster. For example [.dockerignore](./.dockerignore).
 
 ### Step 5.5: Deploying to Google Cloud Run
 
@@ -335,7 +337,7 @@ gcloud auth login
 gcloud auth application-default login
 ```
    * **Special Note on ADC Quota Project**: The ADC setup must successfully associate with your project as a "quota project." This requires your user account to have the serviceusage.services.use permission (e.g., via the "Service Usage Consumer" role) on the project. Errors like USER_PROJECT_DENIED often stem from issues here.  
-   * **Special Note on PROJECT_ID Accuracy**: A typo in PROJECT_ID can cause significant troubleshooting delays. Meticulously verify environment variables.  
+   * **Special Note on PROJECT_ID Accuracy**: A typo in PROJECT_ID can cause significant troubleshooting delays. Meticulously verify environment variables!  
 3. Set Up Environment Variables for Deployment:  
    Use a script or set environment variables like PROJECT_ID, REGION, REPO_NAME, IMAGE_NAME. Example:  
 ```bash  
@@ -344,8 +346,7 @@ export REGION="your-vertex-ai-region" # e.g., us-central1
 export REPO_NAME="cie-repo"  
 export IMAGE_NAME="cie-webapp"
 ```
-4. Create Artifact Registry Repository:  
-   If not done, create a Docker repository:  
+4. Create a Docker Artifact Registry Repository:  
 ```bash  
 gcloud artifacts repositories create ${REPO_NAME} \  
       --repository-format=docker \  
@@ -359,11 +360,11 @@ gcloud auth configure-docker ${REGION}-docker.pkg.dev
 ```
    * **Special Note on Docker CLI**: Ensure Docker CLI is installed and accessible in your WSL environment.  
 6. Build and Tag the Docker Image:  
-   Navigate to ~/projects/cie-0 and build the image:  
+   Navigate to your project's root ~/projects/cie-0 and build the image:  
 ```bash  
 docker build -t ${REGION}-docker.pkg.dev${PROJECT_ID}${REPO_NAME}${IMAGE_NAME}:latest .
 ```
-   * **Special Note on Image Tagging**: If you change PROJECT_ID or other variables used in the tag, you must rebuild the image to apply the new tag before pushing. docker push looks for an image with an exact matching local tag.  
+   * **Special Note on Image Tagging**: If you change PROJECT_ID or other variables used in the tag, you must rebuild the image to apply the new tag before pushing; 'docker push' looks for an image with an exact matching local tag.  
 7. Push the Docker Image:  
 ```bash  
 docker push ${REGION}-docker.pkg.dev${PROJECT_ID}${REPO_NAME}${IMAGE_NAME}:latest
@@ -387,6 +388,7 @@ gcloud run deploy "${SERVICE_NAME}" \
       --cpu=1 \  
       --project="${PROJECT_ID}"
 ```
+You may wish to write a bash script like this [deploy_cloud_run.sh](./deploy_cloud_run.sh) to prompt for API keys. 
    * **Special Note on Cloud Run Resources**: Cloud Run services may need more than default memory (512MiB). Monitor logs for "out of memory" errors and adjust \--memory (e.g., 1Gi, 2Gi) and \--cpu.  
 9. Assign IAM Roles to the Cloud Run Service Account:  
    * Once deployed, find the service account your Cloud Run service uses (in GCP Console under Cloud Run service details).  
