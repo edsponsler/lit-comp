@@ -1,4 +1,4 @@
-# ~/projects/cie-0/run_coordinator_test.py
+# ~/projects/cie-0/run_cie_coordinator_test.py
 import asyncio
 import uuid
 import os
