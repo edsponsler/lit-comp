@@ -132,8 +132,10 @@ CUSTOM_SEARCH_ENGINE_ID=PASTE_YOUR_SEARCH_ENGINE_ID_HERE
 # Virtual environment  
 .venv/
 
-# Environment variables  
+# Environment variables
+# ignore gcenv.sh if implemented
 .env
+gcenv.sh
 
 # Python cache  
 __pycache__/  
@@ -346,6 +348,40 @@ export REGION="your-vertex-ai-region" # e.g., us-central1
 export REPO_NAME="cie-repo"  
 export IMAGE_NAME="cie-webapp"
 ```
+You may wish to create a simple bash script to load these variables like this, named gcenv.sh. 
+```bash
+#!/bin/bash
+# File name: gcenv.sh
+# To use, run: '. ./gcenv.sh'
+#Script to set Google Cloud environment variables for the CIE project
+
+# --- BEGIN USER CONFIGURATION ---
+#
+GCP_PROJECT_ID="cie-0-123456"  # Replace with your Google Cloud Project ID
+GCP_REGION="us-central1"    # Replace with your Google Cloud region (e.g., us-central1)
+ARTIFACT_REPO_NAME="cie-repo"         # Your chosen Artifact Registry repository name
+DOCKER_IMAGE_NAME="cie-webapp"        # Your chosen Docker image name
+SERVICE_NAME="cie-public-ui"
+#
+# # --- END USER CONFIGURATION ---
+
+# # Export the variables
+export PROJECT_ID="${GCP_PROJECT_ID}"
+export REGION="${GCP_REGION}"
+export REPO_NAME="${ARTIFACT_REPO_NAME}"
+export IMAGE_NAME="${DOCKER_IMAGE_NAME}"
+export SERVICE_NAME="${SERVICE_NAME}"
+
+# # You can add a confirmation message (optional)
+echo "Google Cloud environment variables set:"
+echo "PROJECT_ID: ${PROJECT_ID}"
+echo "REGION:     ${REGION}"
+echo "REPO_NAME:  ${REPO_NAME}"
+echo "IMAGE_NAME: ${IMAGE_NAME}"
+echo "SERVICE_NAME: ${SERVICE_NAME}"
+```
+Note: Be sure to .gitignore this file if you have placed it in the project's root. 
+
 4. Create a Docker Artifact Registry Repository:  
 ```bash  
 gcloud artifacts repositories create ${REPO_NAME} \  
