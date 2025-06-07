@@ -1,12 +1,13 @@
-# ~/projects/cie-0/run_cie_coordinator_test.py
+# tests/cie-core/cie_coordinator_test.py
+# Use: python -m tests.cie_core.cie_coordinator_test
 import asyncio
 import uuid
 import os
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types as genai_types
-from agents.coordinator_agent import coordinator_agent
-from tools.status_board_tool import get_status as get_status_from_board
+from cie_core.agents.coordinator_agent import coordinator_agent
+from cie_core.tools.status_board_tool import get_status as get_status_from_board
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -32,7 +33,7 @@ async def cie_coordinator_test():
     print(f"Runner created for agent '{runner_coordinator.agent.name}'.")
 
     user_query_text = (
-        f"User Query: Generate a report on 'Emergent Intelligence research inspired by Marvin Minsky's theory 'Society of Mind'. "
+        f"User Query: Generate a report on 'Hubble Space Telescope. "
         f"Please use session_id: {current_session_id} for all your operations."
     )
     

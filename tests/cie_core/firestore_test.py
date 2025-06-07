@@ -1,4 +1,4 @@
-# test_firestore.py
+# tests/cie_core/firestore_test.py
 from google.cloud import firestore
 import os
 

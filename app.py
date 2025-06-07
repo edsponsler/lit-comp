@@ -5,7 +5,7 @@ from flask import Flask, render_template, request, jsonify
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types as genai_types
-from agents.coordinator_agent import coordinator_agent 
+from cie_core.agents.coordinator_agent import coordinator_agent 
 from dotenv import load_dotenv
 
 load_dotenv() 

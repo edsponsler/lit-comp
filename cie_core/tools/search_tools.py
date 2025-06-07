@@ -1,4 +1,4 @@
-# ~/projects/cie-0/tools/search_tools.py
+# cie_core/tools/search_tools.py
 import os
 import requests
 from bs4 import BeautifulSoup
@@ -13,7 +13,7 @@ CUSTOM_SEARCH_ENGINE_ID = os.getenv("CUSTOM_SEARCH_ENGINE_ID")
 GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT") # For ADK
 
 # Number of search results to process
-NUM_SEARCH_RESULTS = 3 # Let's start with 3
+NUM_SEARCH_RESULTS = 3 # Let's start with 3; try to find a max that works well without hitting API limits
 MAX_CONTENT_LENGTH = 1500 # Max characters to extract per page
 
 def simple_web_search(query: str) -> dict:
@@ -115,6 +115,6 @@ def simple_web_search(query: str) -> dict:
         return {"status": "error", "message": f"An unexpected error occurred: {e_gen}"}
 
 # Re-initialize the FunctionTool with the new simple_web_search function
-search_tool = FunctionTool(simple_web_search) # [cite: 69]
+search_tool = FunctionTool(simple_web_search)
 
 print("SearchTool (simple_web_search - REAL with scraping) defined.")

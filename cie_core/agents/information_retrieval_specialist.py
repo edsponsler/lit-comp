@@ -1,15 +1,14 @@
-# ~/projects/cie-0/agents/information_retrieval_specialist.py
+# cie_core/agents/information_retrieval_specialist.py
 from google.adk.agents import Agent
 
 # Correctly import the tools from your project structure
 # Assuming your project root 'cie-0' is in the Python path or you run from there.
 # If you run from ~/projects/cie-0, these imports should work.
-from tools.status_board_tool import status_board_updater_tool
-from tools.search_tools import search_tool
+from cie_core.tools.status_board_tool import status_board_updater_tool
+from cie_core.tools.search_tools import search_tool
 
-AGENT_MODEL = "gemini-2.0-flash" # Or your preferred model [cite: 263]
-
-# In ~/projects/cie-0/agents/information_retrieval_specialist.py
+#AGENT_MODEL = "gemini-2.0-flash" # Or your preferred model 
+AGENT_MODEL = "gemini-2.5-pro-preview-05-06" # preferred model for this agent
 
 information_retrieval_specialist = Agent(
     name="InformationRetrievalSpecialist_v1",
@@ -29,7 +28,7 @@ information_retrieval_specialist = Agent(
         "Set your `status` to 'processing_request'. This call MUST include the `agent_id` ('InformationRetrievalSpecialist_v1'), "
         "the `session_id`, and the `task_id` you received. Include `status_details` like 'Starting to find information on [topic]'.\n"
         
-        "2. Formulate an effective search query based on the task description you received.\n"
+        "2. Formulate a search query. The query should be the main subject of the task description only. Do not add modifiers like 'trends', 'applications', or 'challenges'. For example, if the request is 'Find information on the Hubble Space Telescope', your search query should be exactly 'Hubble Space Telescope'.\n"
         
         "3. Execute the search. Use the `search_tool` with your formulated query. This tool will perform the web search and scrape content. "
         "Expect the `search_tool` to return a dictionary. If successful, this dictionary will have a 'data' key containing a 'results' list. "

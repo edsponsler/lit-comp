@@ -1,5 +1,6 @@
-# ~/projects/cie-0/tools/status_board_tool.py
+# cie_core/tools/status_board_tool.py
 from google.cloud import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 import datetime
 import uuid
 from google.adk.tools import FunctionTool
@@ -50,9 +51,9 @@ def update_status(
     status: str,
     task_id: Optional[str] = None,
     status_details: Optional[str] = None,
-    # output_references schema: Array of Strings/Objects [cite: 121]
+    # output_references schema: Array of Strings/Objects 
     output_references: Optional[List[Dict[str, Any]]] = None, # More specific: List of Dicts
-    # input_references schema: Array of Strings/Objects [cite: 120]
+    # input_references schema: Array of Strings/Objects 
     input_references: Optional[List[Dict[str, Any]]] = None, # More specific: List of Dicts
     progress_metric: Optional[str] = None,
     dependencies: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -126,9 +127,9 @@ def get_status(session_id: str, task_id: Optional[str] = None, agent_id: Optiona
             return {"status": "success", "results": [], "message": f"No status entry found for task_id: {task_id}."}
     else:
         # If no specific task_id, query by session_id and optionally agent_id
-        query = query.where("session_id", "==", session_id)
+        query = query.where(filter=FieldFilter("session_id", "==", session_id))
         if agent_id:
-            query = query.where("agent_id", "==", agent_id)
+            query = query.where(filter=FieldFilter("agent_id", "==", agent_id))
         
         try:
             for doc_snap in query.order_by("timestamp", direction=firestore.Query.DESCENDING).stream():

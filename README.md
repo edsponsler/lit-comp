@@ -47,8 +47,8 @@ sudo apt install python3.12 python3.12-venv python3-pip
 ```
 3. Create Project Directory:  
 ```bash  
-mkdir -p ~/projects/cie-0  
-cd ~/projects/cie-0
+mkdir -p ~/projects/cie-adk  
+cd ~/projects/cie-adk
 ```
 4. Create and Activate Virtual Environment:  
 ```bash  
@@ -113,7 +113,7 @@ gcloud auth application-default login
 2. You'll also need a [Custom Search Engine ID](https://support.google.com/programmable-search/answer/12499034?hl=en) from the Programmable Search Engine control panel after creating a search engine.  
 3. Open Project in VS Code:  
 ```bash  
-cd ~/projects/cie-0  
+cd ~/projects/cie-adk
 code .
 ```
 4. Create a .env file in the root of your cie-0 project directory:  
@@ -151,15 +151,20 @@ __pycache__/
 
 ### Step 0.7: Project File Structure
 
-In your project's root directory (e.g., ~/projects/cie-0), create the agents and tools directories and initialize them as Python packages:
+In your project's root directory (assuming ~/projects/cie-adk), create the agents and tools directories and initialize them as Python packages. Establish a folder 'cie_core' for these scripts since this README.md covers building the CIE Core:
 
 ```bash
-mkdir agents  
-mkdir tools  
-touch agents/__init__.py  
-touch tools/__init__.py
+cd ~/projects/cie-adk
+mkdir -p cie_core/agents  
+mkdir -p cie_core/templates
+mkdir -p cie_core/tools
+mkdir -p tests/cie_core  
+touch cie_core/agents/__init__.py  
+touch cie_core/tools/__init__.py
 ```
 ### Step 0.8: Initialize Git Repository (Optional)
+
+[This README.md tutorial assumes you are not cloning the edsblog/cie-adk repository's main branch, which contains all of the folders and files mentioned in this README.md. Follow this README.md explicitely if you are building CIE Core from scratch.]
 
 1. Initialize Git:  
 ```bash  
@@ -175,10 +180,11 @@ git push -u origin main
 ```
 ### Step 0.9: Verify Firestore Setup
 
-Create and run the Firestore Test Script [test_firestore.py](./test_firestore.py) in your project's root directory to confirm your connection.
+Create and run the Firestore Test Script [tests/cie_core/firestore_test.py](./tests/cie_core/firestore_test.py) in your project's root directory to confirm your connection.
 
 ```bash
-python test_firestore.py
+cd ~/projects/cie-adk
+python tests/cie_core/firestore_test.py
 ```
 Confirm successful connection and data read/write. If you encounter errors, check the .env file for GOOGLE_CLOUD_PROJECT accuracy, API enablement, gcloud authentication, library installation, and Firestore database existence/rules.
 
@@ -190,7 +196,7 @@ This section covers the creation of the fundamental tools and specialist agents 
 
 This tool allows agents to communicate and coordinate by reading from and writing to a shared "Agent Status Board" in Firestore.  
 
-Create the Agent Status Board as [tools/status_board_tool.py](./tools/status_board_tool.py). This script creates two ADK FunctionTool instances: status_board_updater_tool is initialized with the update_status function and status_board_reader_tool is initialized with the get_status function. These functions update and get status messages from Firestore, along with a helper _make_serializable to handle datetime objects.
+Create the Agent Status Board as [cie_core/tools/status_board_tool.py](./cie_core/tools/status_board_tool.py). This script creates two ADK FunctionTool instances: status_board_updater_tool is initialized with the update_status function and status_board_reader_tool is initialized with the get_status function. These functions update and get status messages from Firestore, along with a helper _make_serializable to handle datetime objects.
 
 * **Special Note on Datetime Serialization**: Firestore Timestamp objects (or datetime.datetime) are not directly JSON serializable. They need conversion (e.g., to ISO 8601 string using .isoformat()) if they are part of a tool's return data that the ADK will process. The _make_serializable function handles this.  
 * **Special Note on Optional Typing**: Use typing.Optional\[Type\] for optional arguments in functions wrapped by FunctionTool with google-adk==0.5.0 to avoid ADK parsing errors.
@@ -199,25 +205,25 @@ Create the Agent Status Board as [tools/status_board_tool.py](./tools/status_boa
 
 This tool uses the Google Custom Search API and scrapes basic content from web pages. Ensure requests and beautifulsoup4 are installed, and your API keys are in the .env file.  
 
-Create the Web Scraping Search Tool as [tools/search_tools.py](./tools/search_tools.py). This script defines simple_web_search which queries the Google API, fetches pages, and uses BeautifulSoup to extract text from \<p\> tags, with error handling and content truncation. An ADK FuntionTool instance named search_tool is initialized with the simple_web_search function. 
+Create the Web Scraping Search Tool as [cie_core/tools/search_tools.py](./cie_core/tools/search_tools.py). This script defines simple_web_search which queries the Google API, fetches pages, and uses BeautifulSoup to extract text from \<p\> tags, with error handling and content truncation. An ADK FuntionTool instance named search_tool is initialized with the simple_web_search function. 
 
 ### Step 1.3: Implement the Information Retrieval Specialist Agent
 
 This agent uses the search_tool to find information and updates its status to the Agent Status Board using the status_board_updater_tool.  
 
-Create the Information Retrieval Specialist Agent as [agents/information_retrieval_specialist.py](./agents/information_retrieval_specialist.py). Its prompt guides it to acknowledge tasks, use the search_tool, and report results (including output_references) or errors to the Agent Status Board, ensuring session_id and task_id are used correctly.
+Create the Information Retrieval Specialist Agent as [cie_core/agents/information_retrieval_specialist.py](./cie_core/agents/information_retrieval_specialist.py). Its prompt guides it to acknowledge tasks, use the search_tool, and report results (including output_references) or errors to the Agent Status Board, ensuring session_id and task_id are used correctly.
 
 ### Step 1.4: Implement the Data Analysis Specialist Agent
 
 This agent processes data retrieved by the Information Retrieval Specialist Agent.  
 
-Create the Data Analysis Specialist Agent as [agents/data_analysis_specialist.py](./agents/data_analysis_specialist.py). Its prompt instructs it to analyze provided text, extract insights, and update the Agent Status Board with structured findings in output_references.
+Create the Data Analysis Specialist Agent as [cie_core/agents/data_analysis_specialist.py](./cie_core/agents/data_analysis_specialist.py). Its prompt instructs it to analyze provided text, extract insights, and update the Agent Status Board with structured findings in output_references.
 
 ### Step 1.5: Implement the Report Formatting Specialist Agent
 
 This agent takes analyzed data and structures it into a final report.
 
-Create the Report Formatting Specialist Agent as [agents/report_formatting_specialist.py](./agents/report_formatting_specialist.py). Its prompt details how to review analyzed data and formatting instructions, organize the information, write the report in Markdown, and update the Agent Status Board with the formatted report in output_references.
+Create the Report Formatting Specialist Agent as [cie_core/agents/report_formatting_specialist.py](./cie_core/agents/report_formatting_specialist.py). Its prompt details how to review analyzed data and formatting instructions, organize the information, write the report in Markdown, and update the Agent Status Board with the formatted report in output_references.
 
 ## Part 2: Testing and Refining the Information Retrieval Specialist
 
@@ -225,7 +231,7 @@ With the Web Scraping Search Tool and Information Retrieval Specialist Agent def
 
 ### Basic Interaction Test using the Retrieval Test Script
 
-Create and use the Retrieval Test Script as [run_retrieval_test.py](./run_retrieval_test.py) to directly test the Information Retrieval Specialist Agent. This script sets up a runner, sends a query, iterates through agent events, and checks the Agent Status Board.
+Create and use the Retrieval Test Script as [tests/cie_core/information_retrieval_test.py](./tests/cie_core/information_retrieval_test.py) to directly test the Information Retrieval Specialist Agent. This script sets up a runner, sends a query, iterates through agent events, and checks the Agent Status Board.
 
 **Special Note on Content Length & Search Results**: Iterative testing with this script helps determine reliable settings for NUM_SEARCH_RESULTS and MAX_CONTENT_LENGTH in search_tools.py. A balance of NUM_SEARCH_RESULTS = 3 and MAX_CONTENT_LENGTH = 1500 characters was found to be stable. Remember that MAX_CONTENT_LENGTH is a character limit; 1500 characters is roughly 200-250 words.
 
@@ -237,7 +243,7 @@ The Coordinator Agent orchestrates the specialist agents.
 
 The Coordinator Agent uses specialist agents as tools via the AgentTool wrapper. 
 
-Create the Coordinator Agent as [agents/coordinator_agent.py](./agents/coordinator_agent.py). This agent's prompt outlines a multi-phase plan: initial setup, information retrieval, data analysis, report formatting, and final delivery, detailing how to delegate tasks to specialists, pass session_id and sub-task task_ids, check their status using the status_board_reader_tool, and process their output_references.
+Create the Coordinator Agent as [cie_core/agents/coordinator_agent.py](./cie_core/agents/coordinator_agent.py). This agent's prompt outlines a multi-phase plan: initial setup, information retrieval, data analysis, report formatting, and final delivery, detailing how to delegate tasks to specialists, pass session_id and sub-task task_ids, check their status using the status_board_reader_tool, and process their output_references.
 
 * **Special Note on AgentTool Usage**: For google-adk==0.5.0, AgentTool is imported from google.adk.tools.agent_tool and instantiated with AgentTool(agent=specialist_agent_instance).  
 * **Special Note on Explicit ID Passing**: For multi-agent coordination where sub-tasks need tracking, the orchestrating agent (Coordinator Agent) must be explicitly prompted to embed session_id and unique sub-task task_ids into the request string it sends to specialist agents. Specialists must then be prompted to use these exact IDs for their status updates.  
@@ -247,7 +253,7 @@ Create the Coordinator Agent as [agents/coordinator_agent.py](./agents/coordinat
 
 ## Part 4: Full System Test (CIE Coordinator Test)
 
-Create [run_cie_coordinator_test.py](./run_cie_coordinator_test.py) to test the entire CIE Core workflow, orchestrated by the Coordinator Agent.
+Create [tests/cie_core/cie_coordinator_test.py](./tests/cie_core/cie_coordinator_test.py) to test the entire CIE Core workflow, orchestrated by the Coordinator Agent.
 
 ### Running the Full Pipeline
 
@@ -271,46 +277,29 @@ This section guides you through deploying a Flask-based web UI for the CIE Core 
 
 ### Step 5.1: Web Application Setup (Flask)
 
-1. Install Flask and Gunicorn:  
-   Ensure your Python virtual environment is active and you are in ~/projects/cie-0.  
+Install Flask and Gunicorn:  
+   Ensure your Python virtual environment is active and you are in ~/projects/cie-adk.  
 ```bash  
 pip install Flask[async] gunicorn
 ```
    * **Special Note on Flask\[async\]**: Flask\[async\] is required because the /process route in app.py is an async def function. Installing this prevents runtime errors.  
-2. Update Project Structure for Web UI:  
-   Create the following new files and directory within your project's root folder (e.g., ~/projects/cie-0):  
-```plaintext
-app.py
-requirements.txt
-Dockerfile
-templates/index.html
-```
-3. Create requirements.txt:  
+
+Create a requirements.txt file in your project root folder: [requirements.txt](./requirements.txt)
    Populate requirements.txt with all Python dependencies including the web-specific ones.  
-```plaintext  
-google-adk==0.5.0  
-google-cloud-firestore  
-python-dotenv  
-requests  
-beautifulsoup4  
-litellm  
-Flask[async]  
-gunicorn
-```
+
 ### Step 5.2: Building the User Interface
 
-1. Create [templates/index.html](./templates/index.html): Populate templates/index.html with HTML, CSS, and JavaScript to create a form for user queries and a display area for the report.  
+Create [cie_core/templates/index.html](./cie_core/templates/index.html) with HTML, CSS, and JavaScript to create a form for user queries and a display area for the report.  
    * **Special Note on JavaScript**: The JavaScript in this file handles form submission, sends an asynchronous request to the /process backend endpoint, and displays the report or errors.
 
 ### Step 5.3: Backend Logic for CIE Integration (Flask app.py)
 
-1. Create [app.py](./app.py): Populate app.py with the provided Flask application code. This script initializes Flask, serves index.html at the root route, and defines an async def process_query() route at /process to interact with the Coordinator Agent and return the report as JSON, including error handling.  
+1. Create [app.py](./app.py) in your project root folder with the provided Flask application code. This script initializes Flask, serves index.html at the root route, and defines an async def process_query() route at /process to interact with the Coordinator Agent and return the report as JSON, including error handling.  
    * **Special Note on async def routes**: The async def route enables asynchronous operations with the ADK's Runner.run_async method.
 
 ### Step 5.4: Preparing for Deployment (Docker)
 
-1. Create Dockerfile:  
-   Create the Dockerfile.  
+1. Create [Dockerfile](./Dockerfile) in the proejct root folder.  
    * **Special Note on CMD instruction**: The CMD instruction in the Dockerfile must use the shell form (e.g., CMD exec gunicorn ...) or an entrypoint script for the $PORT environment variable to be correctly expanded. 
 
 The array / exec form:
@@ -325,8 +314,8 @@ CMD exec gunicorn --bind 0.0.0.0:$PORT --timeout 180 app:app
 ```
 
    * **Special Note on Gunicorn Timeout**: Gunicorn's default worker timeout (30 seconds) can be too short for the CIE's processing. Adding \--timeout 180 (or a suitable value) to the gunicorn command in the Dockerfile is crucial for longer-running queries.  
-1. Create .dockerignore file:  
-   Create the .dockerignore file to exclude unnecessary files (like .venv, \_\_pycache\_\_) from the Docker image, keeping it small and build times faster. For example [.dockerignore](./.dockerignore).
+
+Create [.dockerignore](./.dockerignore) file to exclude unnecessary files (like .venv, \_\_pycache\_\_) from the Docker image, keeping it small and build times faster.
 
 ### Step 5.5: Deploying to Google Cloud Run
 
@@ -353,7 +342,7 @@ You may wish to create a simple bash script to load these variables like this, n
 #!/bin/bash
 # File name: gcenv.sh
 # To use, run: '. ./gcenv.sh'
-#Script to set Google Cloud environment variables for the CIE project
+# Script to set Google Cloud environment variables for the CIE project
 
 # --- BEGIN USER CONFIGURATION ---
 #
@@ -424,7 +413,7 @@ gcloud run deploy "${SERVICE_NAME}" \
       --cpu=1 \  
       --project="${PROJECT_ID}"
 ```
-You may wish to write a bash script like this [deploy_cloud_run.sh](./deploy_cloud_run.sh) to prompt for API keys. 
+You may wish to write a bash script like this in the project root folder [deploy_cloud_run.sh](./deploy_cloud_run.sh) to prompt for API keys. 
    * **Special Note on Cloud Run Resources**: Cloud Run services may need more than default memory (512MiB). Monitor logs for "out of memory" errors and adjust \--memory (e.g., 1Gi, 2Gi) and \--cpu.  
 9. Assign IAM Roles to the Cloud Run Service Account:  
    * Once deployed, find the service account your Cloud Run service uses (in GCP Console under Cloud Run service details).  

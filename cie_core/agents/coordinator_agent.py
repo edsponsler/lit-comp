@@ -1,12 +1,13 @@
-# ~/projects/cie-0/agents/coordinator_agent.py
+# cie_core/agents/coordinator_agent.py
 from google.adk.agents import Agent
 from google.adk.tools.agent_tool import AgentTool # Assuming this path is correct from previous steps
-from agents.information_retrieval_specialist import information_retrieval_specialist
-from agents.data_analysis_specialist import data_analysis_specialist
-from agents.report_formatting_specialist import report_formatting_specialist # Import the new agent
-from tools.status_board_tool import status_board_updater_tool, status_board_reader_tool
+from cie_core.agents.information_retrieval_specialist import information_retrieval_specialist
+from cie_core.agents.data_analysis_specialist import data_analysis_specialist
+from cie_core.agents.report_formatting_specialist import report_formatting_specialist # Import the new agent
+from cie_core.tools.status_board_tool import status_board_updater_tool, status_board_reader_tool
 
-AGENT_MODEL = "gemini-2.0-flash"
+#AGENT_MODEL = "gemini-2.0-flash" # Or your preferred model 
+AGENT_MODEL = "gemini-2.5-pro-preview-05-06" # preferred model for this agent
 
 if not AgentTool: # Should have been resolved, but good check
     raise ImportError("AgentTool class could not be imported. Critical for agent operation.")
