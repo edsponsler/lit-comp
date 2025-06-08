@@ -24,7 +24,7 @@ This tutorial assumes you are using the following development environment:
   * Flask\[async\] (for the web UI)  
   * gunicorn (for running Flask in Cloud Run)
 
-All commands should generally be run in your WSL Ubuntu terminal unless specified otherwise. The primary working directory for this project will be ~/projects/cie-0.
+All commands should generally be run in your WSL Ubuntu terminal unless specified otherwise. The primary working directory for this project will be ~/projects/cie-adk.
 
 ## Part 0: Environment Setup and Foundations
 
@@ -164,7 +164,7 @@ touch cie_core/tools/__init__.py
 ```
 ### Step 0.8: Initialize Git Repository (Optional)
 
-[This README.md tutorial assumes you are not cloning the edsblog/cie-adk repository's main branch, which contains all of the folders and files mentioned in this README.md. Follow this README.md explicitely if you are building CIE Core from scratch.]
+[This README.md tutorial assumes you are not cloning the edsponsler/cie-adk repository's main branch, which contains all of the folders and files mentioned in this README.md. Follow this README.md explicitely if you are building CIE Core from scratch.]
 
 1. Initialize Git:  
 ```bash  
@@ -184,7 +184,7 @@ Create and run the Firestore Test Script [tests/cie_core/firestore_test.py](./te
 
 ```bash
 cd ~/projects/cie-adk
-python tests/cie_core/firestore_test.py
+python -m tests.cie_core.firestore_test
 ```
 Confirm successful connection and data read/write. If you encounter errors, check the .env file for GOOGLE_CLOUD_PROJECT accuracy, API enablement, gcloud authentication, library installation, and Firestore database existence/rules.
 
