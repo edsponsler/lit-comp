@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 load_dotenv() 
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='cie_core/templates')
 
 # Ensure GOOGLE_CLOUD_PROJECT is set for ADK and Firestore client initialization
 # The ADK might try to initialize clients (like for Vertex AI) when agents are imported
