@@ -1,13 +1,14 @@
 # cie_core/agents/coordinator_agent.py
 from google.adk.agents import Agent
-from google.adk.tools.agent_tool import AgentTool # Assuming this path is correct from previous steps
+from google.adk.tools.agent_tool import AgentTool 
+from cie_core.config import DEFAULT_AGENT_MODEL
 from cie_core.agents.information_retrieval_specialist import information_retrieval_specialist
-from cie_core.agents.data_analysis_specialist import data_analysis_specialist
+# from cie_core.agents.data_analysis_specialist import data_analysis_specialist
 from cie_core.agents.report_formatting_specialist import report_formatting_specialist # Import the new agent
 from cie_core.tools.status_board_tool import status_board_updater_tool, status_board_reader_tool
 
-#AGENT_MODEL = "gemini-2.0-flash" # Or your preferred model 
-AGENT_MODEL = "gemini-2.5-pro-preview-05-06" # preferred model for this agent
+# Import our new V2 specialist
+from decon.data_analysis.agents.data_analysis_specialist_v2 import data_analysis_specialist_v2
 
 if not AgentTool: # Should have been resolved, but good check
     raise ImportError("AgentTool class could not be imported. Critical for agent operation.")
@@ -19,10 +20,9 @@ information_retrieval_adapter_tool = AgentTool(
 print(f"AgentTool for InformationRetrievalSpecialist instantiated. Effective tool name: {information_retrieval_specialist.name}")
 
 # Wrapper for DataAnalysisSpecialist
-data_analysis_adapter_tool = AgentTool(
-    agent=data_analysis_specialist
-)
-print(f"AgentTool for DataAnalysisSpecialist instantiated. Effective tool name: {data_analysis_specialist.name}")
+# Use the new V2 specialist
+data_analysis_adapter_tool = AgentTool(agent=data_analysis_specialist_v2)
+print(f"AgentTool for DataAnalysisSpecialist instantiated. Effective tool name: {data_analysis_specialist_v2.name}")
 
 # Wrapper for ReportFormattingSpecialist
 report_formatting_adapter_tool = AgentTool(
@@ -30,10 +30,9 @@ report_formatting_adapter_tool = AgentTool(
 )
 print(f"AgentTool for ReportFormattingSpecialist instantiated. Effective tool name: {report_formatting_specialist.name}")
 
-
 coordinator_agent = Agent(
     name="CoordinatorAgent_v1",
-    model=AGENT_MODEL,
+    model=DEFAULT_AGENT_MODEL,
     description="Orchestrates the report generation by coordinating specialists for information retrieval, analysis, and report formatting.",
     instruction=(
         "You are a Coordinator Agent. Your primary role is to manage the generation of a concise report based on a user's query. "
@@ -41,7 +40,7 @@ coordinator_agent = Agent(
         "\n**Overall Plan Outline:**\n"
         "1. Initial Setup: Acknowledge query, create main task ID, update status board.\n"
         "2. Phase 1: Information Retrieval using the " + f"`{information_retrieval_specialist.name}`" + " tool.\n"
-        "3. Phase 2: Data Analysis using the " + f"`{data_analysis_specialist.name}`" + " tool.\n"
+        "3. Phase 2: Data Analysis using the " + f"`{data_analysis_specialist_v2.name}`" + " tool.\n"
         "4. Phase 3: Report Formatting using the " + f"`{report_formatting_specialist.name}`" + " tool.\n"
         "5. Final Report Delivery.\n"
 
@@ -75,13 +74,13 @@ coordinator_agent = Agent(
         # Phase 2: Data Analysis Steps (P2_1 to P2_5)
         "\n**Phase 2: Data Analysis Steps:**\n"
         "P2_1. After completing P1_5, create a new unique `task_id` for the data analysis sub-task (e.g., append '_analysis' to the main `task_id`).\n"        
-        f"P2_2. Delegate to the `{data_analysis_specialist.name}`. To do this, you will make a call to the `{data_analysis_specialist.name}` tool. "
+        f"P2_2. Delegate to the `{data_analysis_specialist_v2.name}`. To do this, you will make a call to the `{data_analysis_specialist_v2.name}` tool. "
         f"The 'request' argument for this tool call MUST be a string you construct, which includes:\n"
         f"    a. The actual retrieved data content that you obtained in step P1_4 (this is the `content` from the `output_references` of the completed retrieval task).\n"
         f"    b. A clear analysis instruction derived from the original user query (e.g., 'Based on the original query about [original topic] and the provided data, please summarize the key findings, identify main themes, and extract 3-5 key bullet points.').\n"
         f"    c. A CRITICAL instruction for the specialist: 'For all your status updates via `status_board_updater_tool`, you MUST use session_id: [the_current_session_id_as_provided_to_you] and task_id: [the_analysis_sub_task_id_you_created_in_P2_1].'. "
         f"Replace the bracketed placeholders with the actual `session_id` and the specific analysis `task_id` you generated in step P2_1.\n"        
-        f"P2_3. Check Specialist Status (Attempt 1): After the `{data_analysis_specialist.name}` was called in P2_2, you MUST use the `status_board_reader_tool` (which is `get_status`) exactly ONCE to check the status of the delegated analysis `task_id` (e.g., 'main_report_task_XYZ_analysis') using the correct `session_id`.\n"
+        f"P2_3. Check Specialist Status (Attempt 1): After the `{data_analysis_specialist_v2.name}` was called in P2_2, you MUST use the `status_board_reader_tool` (which is `get_status`) exactly ONCE to check the status of the delegated analysis `task_id` (e.g., 'main_report_task_XYZ_analysis') using the correct `session_id`.\n"
         "P2_4. Process Specialist Results and Decide Next Step: Carefully examine the dictionary returned by `status_board_reader_tool`. "
         "   - The tool's direct output will have a 'results' key, which is a list of status entries. If this 'results' list is empty or the overall tool 'status' is 'error', the specialist's status could not be retrieved. Consider this an error, set your `status_details` for P2_5 to 'Error: Failed to retrieve specialist status for task [analysis_task_id].', and proceed to P2_5.\n"
         "   - If the 'results' list is NOT empty, take the FIRST entry from that list. This entry is a dictionary representing the specialist's status. Check its 'status' field and its 'output_references' field.\n"
@@ -122,7 +121,7 @@ coordinator_agent = Agent(
     tools=[
         information_retrieval_adapter_tool,
         data_analysis_adapter_tool,
-        report_formatting_adapter_tool, # Added the new tool
+        report_formatting_adapter_tool, 
         status_board_updater_tool,
         status_board_reader_tool
     ],

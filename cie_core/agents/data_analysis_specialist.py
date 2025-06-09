@@ -1,14 +1,12 @@
 # cie_core/agents/data_analysis_specialist.py
 
 from google.adk.agents import Agent
+from cie_core.config import DEFAULT_AGENT_MODEL
 from cie_core.tools.status_board_tool import status_board_updater_tool
-
-# Ensure your AGENT_MODEL is defined, perhaps in a shared constants file or imported
-AGENT_MODEL = "gemini-2.0-flash" # Or your chosen model
 
 data_analysis_specialist = Agent(
     name="DataAnalysisSpecialist_v1",
-    model=AGENT_MODEL,
+    model=DEFAULT_AGENT_MODEL,
     description="Specializes in processing and analyzing textual data to extract key insights, themes, and summaries.", #
     instruction=(
         "You are a Data Analysis Specialist. Your task is to process retrieved textual information and extract key insights. "

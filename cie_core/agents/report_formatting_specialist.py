@@ -1,14 +1,12 @@
 # cie_core/agents/report_formatting_specialist.py
 from google.adk.agents import Agent
+from cie_core.config import DEFAULT_AGENT_MODEL
 from cie_core.tools.status_board_tool import status_board_updater_tool
 from typing import Dict, Any, List # For type hinting
 
-# Ensure your AGENT_MODEL is defined, perhaps in a shared constants file or imported
-AGENT_MODEL = "gemini-2.0-flash" # Or your chosen model
-
 report_formatting_specialist = Agent(
     name="ReportFormattingSpecialist_v1",
-    model=AGENT_MODEL,
+    model=DEFAULT_AGENT_MODEL,
     description="Specializes in taking analyzed data and structuring it into a coherent, well-formatted report, often using Markdown.",
     instruction=(
         "You are a Report Formatting Specialist. Your task is to take analyzed data and formatting instructions to create a final, presentable report. "

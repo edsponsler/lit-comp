@@ -1,18 +1,12 @@
 # cie_core/agents/information_retrieval_specialist.py
 from google.adk.agents import Agent
-
-# Correctly import the tools from your project structure
-# Assuming your project root 'cie-0' is in the Python path or you run from there.
-# If you run from ~/projects/cie-0, these imports should work.
+from cie_core.config import DEFAULT_AGENT_MODEL
 from cie_core.tools.status_board_tool import status_board_updater_tool
 from cie_core.tools.search_tools import search_tool
 
-#AGENT_MODEL = "gemini-2.0-flash" # Or your preferred model 
-AGENT_MODEL = "gemini-2.5-pro-preview-05-06" # preferred model for this agent
-
 information_retrieval_specialist = Agent(
     name="InformationRetrievalSpecialist_v1",
-    model=AGENT_MODEL,
+    model=DEFAULT_AGENT_MODEL,
     description=(
         "Specializes in finding and retrieving textual information from the web "
         "based on a given topic or query. It updates a central status board "
