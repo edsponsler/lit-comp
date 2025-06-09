@@ -14,7 +14,7 @@ STOPWORDS = set([
 
 def extract_keywords(text_input: str) -> dict:
     """
-    Extracts keywords and returns them as a JSON string.
+    Extracts keywords from the input text and returns them as a dictionary.
     """
     if not isinstance(text_input, str) or not text_input:
         return {"keywords": []}

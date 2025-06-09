@@ -44,13 +44,8 @@ def post_micro_entry(
 ) -> dict:
     """Creates or updates an entry on the Micro-Task Board.
 
-    This function was deliberately refactored to accept complex payloads
-    (input_payload_json, output_payload_json) as JSON strings. This design
-    choice creates a simple and robust "contract" for the ADK FunctionTool.
-    By using strings, we avoid potential API errors that can arise from
-    the automatic schema generation of complex dictionary type hints,
-    ensuring maximum reliability when this tool is used by an LLM agent.
-    The function itself handles the safe decoding of these JSON strings.
+    Accepts complex payload data as JSON-formatted strings to ensure
+    safe and reliable serialization for storage in Firestore.
     """
     client = _get_firestore_client()
     if not client:
@@ -105,12 +100,8 @@ def get_micro_entries(
 ) -> dict:
     """Retrieves entries from the Micro-Task Board based on query parameters.
 
-    As part of a robust design pattern for ADK tools, this function returns
-    its findings as a single JSON string rather than a direct Python object.
-    This maintains a consistent, simple, and reliable string-based contract
-    with the calling LLM agent. The agent is then responsible for parsing
-    this string to use the data, keeping the tool's interface with the
-    underlying API as clean as possible.
+    Returns a dictionary containing the status of the operation and the
+    retrieved data entries.
     """
     client = _get_firestore_client()
     if not client:
