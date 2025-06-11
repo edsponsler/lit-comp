@@ -1,5 +1,5 @@
 # Architectural Reference for decon/data-analysis
-
+[CIE Wiki](https://github.com/edsponsler/cie-adk/wiki)
 ## 1. Overall Architecture
 
 The `decon/data-analysis` module provides specialized services for performing detailed data analysis. Its primary purpose is to break down complex analysis tasks into smaller, manageable, and traceable units of work. This is achieved through a combination of deterministic orchestration, a micro-task management system, specialized agents, and core processing libraries.
