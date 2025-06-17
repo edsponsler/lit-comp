@@ -1,19 +1,26 @@
-# literary_companion/tools/translation_tool.py
+# This tool will now use the same powerful Vertex AI model as our other components
+import vertexai
+from vertexai.generative_models import GenerativeModel
+from cie_core.config import DEFAULT_AGENT_MODEL
 
-from google.cloud import translate_v2 as translate
-from google.adk.tools import FunctionTool
-
-def translate_text(text: str, target_language: str = 'en-US') -> str:
-    """Translates a body of text using Google Cloud Translation API."""
+def translate_text(text: str) -> str:
+    """Translates classic literary text into modern, easy-to-read English using an AI model."""
     try:
-        translate_client = translate.Client()
-        result = translate_client.translate(text, target_language=target_language)
-        translated_text = result['translatedText']
-        print(f"--- Tool: Successfully translated {len(text)} chars ---")
-        return translated_text
+        model = GenerativeModel(DEFAULT_AGENT_MODEL)
+        
+        # This prompt asks for a change in style, not just literal translation
+        prompt = (
+            "You are a helpful translation assistant. Your task is to rephrase the following "
+            "passage from a classic novel into clear, modern, and easily understandable English. "
+            "Preserve the original meaning, characters, and events exactly. Only update the "
+            "vocabulary, sentence structure, and tone to be more contemporary. Do not add any "
+            "commentary or introductions.\n\n"
+            f"CLASSIC TEXT:\n---\n{text}\n---\n\nMODERN TRANSLATION:"
+        )
+        
+        response = model.generate_content(prompt)
+        return response.text
     except Exception as e:
-        print(f"--- Tool: Error during translation: {e} ---")
+        print(f"--- Tool: Error during AI translation: {e} ---")
         return f"Error: Translation failed. {e}"
-
-# Expose the function as an ADK FunctionTool
-translation_tool = FunctionTool(translate_text)
+    
