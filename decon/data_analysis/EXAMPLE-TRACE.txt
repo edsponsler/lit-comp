@@ -1,0 +1,153 @@
+(.venv) ed@edsbox:~/projects/cie-adk$ python app.py
+StatusBoardTool (updater and reader) defined with Optional typing and datetime serialization.
+SearchTool (simple_web_search - REAL with scraping) defined.
+Agent 'InformationRetrievalSpecialist_v1' created.
+Agent 'ReportFormattingSpecialist_v1' created.
+AgentTool for InformationRetrievalSpecialist instantiated. Effective tool name: InformationRetrievalSpecialist_v1
+AgentTool for DataAnalysisSpecialist instantiated. Effective tool name: DataAnalysisSpecialist_v2
+AgentTool for ReportFormattingSpecialist instantiated. Effective tool name: ReportFormattingSpecialist_v1
+Agent 'CoordinatorAgent_v1' created with tools. (Prompt covers Initial Setup, Phase 1, Phase 2, & Phase 3)
+ * Serving Flask app 'app'
+ * Debug mode: on
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:5001
+Press CTRL+C to quit
+ * Restarting with stat
+StatusBoardTool (updater and reader) defined with Optional typing and datetime serialization.
+SearchTool (simple_web_search - REAL with scraping) defined.
+Agent 'InformationRetrievalSpecialist_v1' created.
+Agent 'ReportFormattingSpecialist_v1' created.
+AgentTool for InformationRetrievalSpecialist instantiated. Effective tool name: InformationRetrievalSpecialist_v1
+AgentTool for DataAnalysisSpecialist instantiated. Effective tool name: DataAnalysisSpecialist_v2
+AgentTool for ReportFormattingSpecialist instantiated. Effective tool name: ReportFormattingSpecialist_v1
+Agent 'CoordinatorAgent_v1' created with tools. (Prompt covers Initial Setup, Phase 1, Phase 2, & Phase 3)
+ * Debugger is active!
+ * Debugger PIN: 487-933-207
+127.0.0.1 - - [20/Jun/2025 07:17:38] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [20/Jun/2025 07:17:38] "GET /favicon.ico HTTP/1.1" 404 -
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+--- Tool: update_status called by CoordinatorAgent_v1 for session session_25787d64-50e0-4c7b-9cb4-fe0290b2eb62, task main_report_task_hubble_hst with status processing_user_request ---
+--- Tool: Status updated successfully for entry_id: main_report_task_hubble_hst (Task ID: main_report_task_hubble_hst) ---
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+--- Tool: update_status called by InformationRetrievalSpecialist_v1 for session session_25787d64-50e0-4c7b-9cb4-fe0290b2eb62, task main_report_task_hubble_hst_retrieval with status processing_request ---
+--- Tool: Status updated successfully for entry_id: main_report_task_hubble_hst_retrieval (Task ID: main_report_task_hubble_hst_retrieval) ---
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+--- Tool: simple_web_search (real) called with query: Hubble Space Telescope ---
+--- Tool: Querying Google Custom Search API: https://www.googleapis.com/customsearch/v1?key=[API_KEY_HIDDEN]&cx=26501b3ee9ff9452e&q=Hubble Space Telescope&num=3 ---
+--- Tool: Found 3 search results. Attempting to scrape... ---
+--- Tool: Attempting to scrape content from: https://en.wikipedia.org/wiki/Hubble_Space_Telescope ---
+--- Tool: Successfully scraped and processed: https://en.wikipedia.org/wiki/Hubble_Space_Telescope ---
+--- Tool: Attempting to scrape content from: https://en.wikipedia.org/wiki/Pillars_of_Creation ---
+--- Tool: Successfully scraped and processed: https://en.wikipedia.org/wiki/Pillars_of_Creation ---
+--- Tool: Attempting to scrape content from: https://en.wikipedia.org/wiki/James_Webb_Space_Telescope ---
+--- Tool: Successfully scraped and processed: https://en.wikipedia.org/wiki/James_Webb_Space_Telescope ---
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+--- Tool: update_status called by InformationRetrievalSpecialist_v1 for session session_25787d64-50e0-4c7b-9cb4-fe0290b2eb62, task main_report_task_hubble_hst_retrieval with status completed_task ---
+--- Tool: Status updated successfully for entry_id: main_report_task_hubble_hst_retrieval (Task ID: main_report_task_hubble_hst_retrieval) ---
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+--- Tool: get_status called for session session_25787d64-50e0-4c7b-9cb4-fe0290b2eb62, task main_report_task_hubble_hst_retrieval, agent None ---
+--- Tool: Status retrieved for task_id: main_report_task_hubble_hst_retrieval ---
+--- Tool: Found 1 status entries for session session_25787d64-50e0-4c7b-9cb4-fe0290b2eb62, agent any ---
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+--- Tool: update_status called by CoordinatorAgent_v1 for session session_25787d64-50e0-4c7b-9cb4-fe0290b2eb62, task main_report_task_hubble_hst with status completed_retrieval_coordination ---
+--- Tool: Status updated successfully for entry_id: main_report_task_hubble_hst (Task ID: main_report_task_hubble_hst) ---
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+--- Orchestrator: Starting Data Analysis Agency ---
+--- Orchestrator: Phase 1 - Segmentation ---
+--- Orchestrator: Segmented into 25 sentences. ---
+--- Orchestrator: Phase 2 - Posting Sentence Tasks ---
+--- Tool: Firestore client for Micro-Task Board initialized. ---
+--- Tool: Micro-Task Board entry 'micro_entry_903b1748-9063-4209-9a4b-9ebe3f8a36e8' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_fad4ab24-02ca-410d-a2ff-aa893e3e772a' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_1d655417-928a-4557-b578-856dcc2e4f0b' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_368d70ff-3db4-493b-adbe-6e922ca3c575' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_86557064-6021-469f-a070-17a74f823214' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_bbe25a3b-01d6-435a-8063-61a59ce69834' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_85e202f4-5d33-4b52-9190-10b8840b9500' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_ae462d54-063b-4713-b6f0-2eb535a0ac2d' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_0c9fce8a-ad3f-4932-870a-83702d9bc658' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_baf1924b-d9f9-485a-aa70-95d30d6b64c5' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_85900862-0494-4ab8-8b3d-e13d2dcc702b' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_bec8ec09-8b10-4164-a536-ca37a57d1642' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_4dd3bb15-5960-4f26-9531-e2b8c1d848da' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_42ae57df-eea3-47d8-a765-7760792e81da' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_14437426-9c51-4469-b9ce-5f629cca1dc0' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_0c0aa22d-ed93-4d97-add3-495015371b6d' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_66492a6f-2cb3-4de6-a820-fa44e3ef66c2' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_819a919c-a99e-4f6e-8faf-0bbc7f4d1a03' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_e8d3cb0c-8033-4864-9bf0-39372afd95b9' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_31122eb0-1297-470e-9258-a26c3e3e3ed2' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_ee88aa7d-7a05-4830-ba0a-3990b6f5e0bb' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_b42de44d-5a80-429b-ae97-eaece09512b7' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_86fe1417-4ddf-45ee-8c0c-2fcb71adc926' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_f1656a29-4be8-491b-9b2e-9e71224544d4' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Tool: Micro-Task Board entry 'micro_entry_2a6f285e-172e-4bff-95c6-e03453aeb192' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: new_task ---
+--- Orchestrator: Phase 3 - Keyword Extraction ---
+--- Tool: Micro-Task Board entry 'micro_entry_963b7413-d87c-480d-ad90-fa8b3c79ea3d' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_2a6f285e-172e-4bff-95c6-e03453aeb192' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_15b43977-2aaa-48dd-b7f7-cee56a229dd6' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_f1656a29-4be8-491b-9b2e-9e71224544d4' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_5981934a-02ec-4d30-81df-d6090ec84fa9' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_86fe1417-4ddf-45ee-8c0c-2fcb71adc926' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_86a934e9-0ddc-4cbe-9a4a-f448c82a6d21' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_b42de44d-5a80-429b-ae97-eaece09512b7' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_f7a8f063-35a2-4038-9762-93e333ad789d' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_ee88aa7d-7a05-4830-ba0a-3990b6f5e0bb' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_b9abca48-9495-433a-9eef-bd63ffd94591' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_31122eb0-1297-470e-9258-a26c3e3e3ed2' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_fde840bb-8e21-4891-a696-7e994185b8e5' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_e8d3cb0c-8033-4864-9bf0-39372afd95b9' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_16612ee1-5d8f-4afd-9731-fe5253c879d1' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_819a919c-a99e-4f6e-8faf-0bbc7f4d1a03' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_3a062b14-a1db-4ca4-b9e7-877b037ad74d' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_66492a6f-2cb3-4de6-a820-fa44e3ef66c2' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_802088b1-7f24-405d-91c7-4b861f7f65cb' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_0c0aa22d-ed93-4d97-add3-495015371b6d' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_8f4cc5ce-a906-4ad9-91d0-a37e8dca1f8e' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_14437426-9c51-4469-b9ce-5f629cca1dc0' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_93f99263-2738-451c-a9cd-3a5c54ce7a57' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_42ae57df-eea3-47d8-a765-7760792e81da' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_13ccae4a-b754-466c-b311-7e74ec95944a' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_4dd3bb15-5960-4f26-9531-e2b8c1d848da' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_ce60aabe-35be-47d9-81e7-ef3c14fa0450' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_bec8ec09-8b10-4164-a536-ca37a57d1642' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_81d00d82-a614-48e3-bc3c-35f56afd123f' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_85900862-0494-4ab8-8b3d-e13d2dcc702b' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_e54d1419-af14-4ffd-9ba8-f602c10aa76e' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_baf1924b-d9f9-485a-aa70-95d30d6b64c5' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_2e0e803d-61d6-416f-912e-80815f8da4f4' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_0c9fce8a-ad3f-4932-870a-83702d9bc658' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_dfc6474b-c843-4077-8bef-e099a2a3b0ac' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_ae462d54-063b-4713-b6f0-2eb535a0ac2d' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_afbd5360-573e-49f5-9d0e-c88399a73d9a' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_85e202f4-5d33-4b52-9190-10b8840b9500' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Tool: Micro-Task Board entry 'micro_entry_f6e6e675-f6c0-49ce-85d1-4a97e26097d1' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: completed ---
+--- Tool: Micro-Task Board entry 'micro_entry_bbe25a3b-01d6-435a-8063-61a59ce69834' for agency_task_id 'main_report_task_hubble_hst_analysis' posted/updated. Status: processing_complete ---
+--- Orchestrator: Phase 4 - Synthesis ---
+--- Orchestrator: Analysis Complete. ---
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+--- Tool: get_status called for session session_25787d64-50e0-4c7b-9cb4-fe0290b2eb62, task main_report_task_hubble_hst_analysis, agent None ---
+--- Tool: No status entry found for task_id: main_report_task_hubble_hst_analysis ---
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+--- Tool: get_status called for session session_25787d64-50e0-4c7b-9cb4-fe0290b2eb62, task main_report_task_hubble_hst_analysis, agent None ---
+--- Tool: No status entry found for task_id: main_report_task_hubble_hst_analysis ---
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+--- Tool: update_status called by CoordinatorAgent_v1 for session session_25787d64-50e0-4c7b-9cb4-fe0290b2eb62, task main_report_task_hubble_hst with status completed_analysis_coordination ---
+--- Tool: Status updated successfully for entry_id: main_report_task_hubble_hst (Task ID: main_report_task_hubble_hst) ---
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+--- Tool: update_status called by ReportFormattingSpecialist_v1 for session session_25787d64-50e0-4c7b-9cb4-fe0290b2eb62, task main_report_task_hubble_hst_formatting with status processing_formatting_request ---
+--- Tool: Status updated successfully for entry_id: main_report_task_hubble_hst_formatting (Task ID: main_report_task_hubble_hst_formatting) ---
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+--- Tool: update_status called by ReportFormattingSpecialist_v1 for session session_25787d64-50e0-4c7b-9cb4-fe0290b2eb62, task main_report_task_hubble_hst_formatting with status completed_formatting ---
+--- Tool: Status updated successfully for entry_id: main_report_task_hubble_hst_formatting (Task ID: main_report_task_hubble_hst_formatting) ---
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+--- Tool: get_status called for session session_25787d64-50e0-4c7b-9cb4-fe0290b2eb62, task main_report_task_hubble_hst_formatting, agent None ---
+--- Tool: Status retrieved for task_id: main_report_task_hubble_hst_formatting ---
+--- Tool: Found 1 status entries for session session_25787d64-50e0-4c7b-9cb4-fe0290b2eb62, agent any ---
+Warning: there are non-text parts in the response: ['function_call'], returning concatenated text result from text parts. Check the full candidates.content.parts accessor to get the full model response.
+--- Tool: update_status called by CoordinatorAgent_v1 for session session_25787d64-50e0-4c7b-9cb4-fe0290b2eb62, task main_report_task_hubble_hst with status completed_formatting_coordination ---
+--- Tool: Status updated successfully for entry_id: main_report_task_hubble_hst (Task ID: main_report_task_hubble_hst) ---
+127.0.0.1 - - [20/Jun/2025 07:25:15] "POST /process HTTP/1.1" 200 -
