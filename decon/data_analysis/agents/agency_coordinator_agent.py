@@ -6,7 +6,7 @@ from cie_core.config import DEFAULT_AGENT_MODEL
 
 # Import our new micro-agent functions and micro-task board tools
 from decon.data_analysis.tools.micro_task_board_tool import post_micro_entry, get_micro_entries
-from decon.data_analysis.agents.data_analysis_micro_agents import extract_keywords, segment_sentences
+from decon.data_analysis.lib.data_analysis_micro_agents import extract_keywords, segment_sentences
 
 # --- 1. Define the Instruction Prompt ---
 
