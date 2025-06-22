@@ -1,3 +1,5 @@
+# decon/data_analysis/tools/micro_task_board_tool.py
+
 import datetime
 import uuid
 import json
@@ -5,8 +7,6 @@ from typing import Optional, Dict, Any, List
 from google.cloud import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 
-# Configuration
-MICRO_TASK_BOARD_COLLECTION = "micro_task_board_cda"
 db = None
 
 def _get_firestore_client():
@@ -16,7 +16,7 @@ def _get_firestore_client():
             db = firestore.Client()
             print("--- Tool: Firestore client for Micro-Task Board initialized. ---")
         except Exception as e:
-            print(f"--- Tool: CRITICAL Failed to initialize Firestore client for Micro-Task Board: {e} ---")
+            print(f"--- Tool: CRITICAL Failed to initialize Firestore client: {e} ---")
     return db
 
 def _make_serializable(data: Any) -> Any:
@@ -35,59 +35,39 @@ def post_micro_entry(
     micro_agent_id: Optional[str] = None,
     task_type: Optional[str] = None,
     input_data_ref: Optional[List[str]] = None,
-    # These are JSON strings that will be parsed into dictionaries
-    input_payload_json: Optional[str] = None,
-    output_payload_json: Optional[str] = None,
+    # --- accept dictionaries directly ---
+    input_payload_dict: Optional[Dict[str, Any]] = None,
+    output_payload_dict: Optional[Dict[str, Any]] = None,
     error_details: Optional[str] = None,
     trigger_conditions: Optional[List[str]] = None,
     entry_id: Optional[str] = None
 ) -> dict:
-    """Creates or updates an entry on the Micro-Task Board.
-
-    Accepts complex payload data as JSON-formatted strings to ensure
-    safe and reliable serialization for storage in Firestore.
-    """
+    """Creates or updates an entry, accepting Python dicts directly for payloads."""
     client = _get_firestore_client()
     if not client:
         return {"status": "error", "message": "Firestore client not available."}
 
-    # Parse the JSON strings into dictionaries
-    try:
-        input_payload = json.loads(input_payload_json) if input_payload_json else None
-        output_payload = json.loads(output_payload_json) if output_payload_json else None
-    except json.JSONDecodeError as e:
-        print(f"--- Tool: Error decoding JSON payload: {e} ---")
-        return {"status": "error", "message": f"Invalid JSON payload provided: {e}"}
-
-    # Use the newly parsed payload variables.
     if not entry_id:
         entry_id = f"micro_entry_{uuid.uuid4()}"
 
     log_data = {
-        "entry_id": entry_id,
-        "agency_task_id": agency_task_id,
-        "session_id": session_id,
-        "micro_agent_id": micro_agent_id,
-        "posted_timestamp": firestore.SERVER_TIMESTAMP,
-        "status": status,
-        "task_type": task_type,
-        "input_data_ref": input_data_ref,
-        "input_payload": input_payload, # Use the parsed variable
-        "output_payload": output_payload, # Use the parsed variable
-        "error_details": error_details,
-        "trigger_conditions": trigger_conditions,
+        "entry_id": entry_id, "agency_task_id": agency_task_id,
+        "session_id": session_id, "micro_agent_id": micro_agent_id,
+        "posted_timestamp": firestore.SERVER_TIMESTAMP, "status": status,
+        "task_type": task_type, "input_data_ref": input_data_ref,
+        # --- Use the dictionaries directly ---
+        "input_payload": input_payload_dict,
+        "output_payload": output_payload_dict,
+        "error_details": error_details, "trigger_conditions": trigger_conditions,
     }
-
-    # Remove None fields to keep documents clean
     log_data = {k: v for k, v in log_data.items() if v is not None}
-
     try:
-        doc_ref = client.collection(MICRO_TASK_BOARD_COLLECTION).document(entry_id)
-        doc_ref.set(log_data, merge=True) # merge=True allows incremental updates
-        print(f"--- Tool: Micro-Task Board entry '{entry_id}' for agency_task_id '{agency_task_id}' posted/updated. Status: {status} ---")
-        return {"status": "success", "entry_id": entry_id, "message": "Entry posted successfully."}
+        doc_ref = client.collection("micro_task_board_cda").document(entry_id)
+        doc_ref.set(log_data, merge=True)
+        print(f"--- Tool: Micro-Task Board entry '{entry_id}' posted/updated. Status: {status} ---")
+        return {"status": "success", "entry_id": entry_id}
     except Exception as e:
-        print(f"--- Tool: Error posting Micro-Task Board entry '{entry_id}': {e} ---")
+        print(f"--- Tool: Error posting entry '{entry_id}': {e} ---")
         return {"status": "error", "entry_id": entry_id, "message": str(e)}
 
 def get_micro_entries(
@@ -98,34 +78,19 @@ def get_micro_entries(
     micro_agent_id: Optional[str] = None,
     limit: Optional[int] = 20
 ) -> dict:
-    """Retrieves entries from the Micro-Task Board based on query parameters.
-
-    Returns a dictionary containing the status of the operation and the
-    retrieved data entries.
-    """
     client = _get_firestore_client()
-    if not client:
-        return {"status": "error", "message": "Firestore client not available."}
+    if not client: return {"status": "error", "message": "Firestore client not available."}
     try:
-        query = client.collection(MICRO_TASK_BOARD_COLLECTION)
-        if agency_task_id:
-            query = query.where(filter=FieldFilter("agency_task_id", "==", agency_task_id))
-        if session_id:
-            query = query.where(filter=FieldFilter("session_id", "==", session_id))
-        if status:
-            query = query.where(filter=FieldFilter("status", "==", status))
-        if task_type:
-            query = query.where(filter=FieldFilter("task_type", "==", task_type))
-        if micro_agent_id:
-            query = query.where(filter=FieldFilter("micro_agent_id", "==", micro_agent_id))
-
+        query = client.collection("micro_task_board_cda")
+        if agency_task_id: query = query.where(filter=FieldFilter("agency_task_id", "==", agency_task_id))
+        if session_id: query = query.where(filter=FieldFilter("session_id", "==", session_id))
+        if status: query = query.where(filter=FieldFilter("status", "==", status))
+        if task_type: query = query.where(filter=FieldFilter("task_type", "==", task_type))
+        if micro_agent_id: query = query.where(filter=FieldFilter("micro_agent_id", "==", micro_agent_id))
         query = query.order_by("posted_timestamp", direction=firestore.Query.DESCENDING)
-        if limit:
-            query = query.limit(limit)
-        results = [
-            _make_serializable(doc.to_dict()) for doc in query.stream()
-        ]
+        if limit: query = query.limit(limit)
+        results = [_make_serializable(doc.to_dict()) for doc in query.stream()]
         return {"status": "success", "data": results}
     except Exception as e:
-        print(f"--- Tool: Error retrieving Micro-Task Board entries: {e} ---")
+        print(f"--- Tool: Error retrieving entries: {e} ---")
         return {"status": "error", "message": str(e), "data": []}

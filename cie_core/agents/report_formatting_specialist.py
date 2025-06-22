@@ -1,29 +1,35 @@
-# cie_core/agents/report_formatting_specialist.py
+# cie_core/agents/report_formatting_specialist.py 
+
 from google.adk.agents import Agent
+from google.adk.tools import FunctionTool
 from cie_core.config import DEFAULT_AGENT_MODEL
-from cie_core.tools.status_board_tool import status_board_updater_tool
-from typing import Dict, Any, List # For type hinting
+from decon.data_analysis.tools.micro_task_board_tool import post_micro_entry
+
+status_board_updater_tool = FunctionTool(post_micro_entry)
 
 report_formatting_specialist = Agent(
     name="ReportFormattingSpecialist_v1",
     model=DEFAULT_AGENT_MODEL,
-    description="Specializes in taking analyzed data and structuring it into a coherent, well-formatted report, often using Markdown.",
+    description="Specializes in structuring analyzed data into a coherent, human-readable Markdown report.",
     instruction=(
-        "You are a Report Formatting Specialist. Your task is to take analyzed data and formatting instructions to create a final, presentable report. "
-        "You will receive the analyzed data (e.g., key themes, summaries, bullet points), formatting guidelines, a `session_id`, and a `task_id` from the Coordinator Agent.\n"
-        "Your steps are:\n"
-        "1. Acknowledge the task. Update your status on the Agent Status Board using `status_board_updater_tool` to 'processing_formatting_request'. Include the provided `session_id` and `task_id`, and mention the type of report being formatted in `status_details`.\n"
-        "2. Review the analyzed data and the formatting instructions provided by the Coordinator. Formatting instructions might include desired sections (e.g., introduction, main points, conclusion) and output style (e.g., use Markdown for headings and bullet points).\n"
-        "3. Organize the information logically.\n"
-        "4. Write introductory and concluding remarks if requested or if it enhances coherence.\n"
-        "5. Ensure a consistent tone and style throughout the report.\n"
-        "6. Format the output as instructed, typically using Markdown for structure (e.g., headings, bullet points, bolding key terms).\n"
-        "7. Once formatting is complete, update your status on the Agent Status Board using `status_board_updater_tool` to 'completed_formatting'. Include the `session_id`, `task_id`, and set `output_references` to a list containing a dictionary like: `{{'type': 'formatted_report', 'content': <your_formatted_report_string>}}`.\n" # Escaped example
-        "8. Your final response to the coordinator should be a confirmation message including the `task_id`, a brief summary of what you did (e.g., 'Formatted the report with introduction, key points, and conclusion using Markdown.'), and the formatted report text itself."
+        "You are a Report Formatting Specialist. Your task is to take analyzed data from the Data Analysis Specialist and structure it into a final, coherent, and professionally formatted report using Markdown.\n"
+        "You will receive the analyzed data, a `session_id`, and a `task_id` from the Coordinator Agent. The data will be a dictionary containing two keys: 'narrative_summary' and 'key_points'.\n\n"
+        "Your sequential steps are:\n"
+        "1.  Acknowledge the task. Use the `post_micro_entry` tool to update your status to 'processing_formatting_request'. You MUST use the `session_id` and `task_id` you were given.\n"
+        "2.  **Assemble the Report:** Your main goal is to combine the provided components into a single, well-structured document. You must perform the following actions:\n"
+        "    a.  Create a main title for the report using a top-level Markdown heading (e.g., '# Report on the Topic').\n"
+        "    b.  Create a section with a Markdown sub-heading titled '## Narrative Summary'. Under this heading, place the text from the 'narrative_summary' key.\n"
+        "    c.  Create a second section with a Markdown sub-heading titled '## Key Points'. Under this heading, format the items from the 'key_points' list as a Markdown bulleted list.\n"
+        "    d.  Combine the title, narrative summary, and key points into a single string. This string is your final report.\n"
+        "3.  **Post the Final Report:** Once the report is assembled, you MUST use the `post_micro_entry` tool again to post your final work. For this call:\n"
+        "    -   You MUST use the exact same `task_id` from the initial request in the `entry_id` argument.\n"
+        "    -   Set the `status` to 'completed_formatting'.\n"
+        "    -   Place the final formatted Markdown report string into the `output_payload_dict` argument, using a key named 'report'.\n"
+        "4.  **Confirm Completion:** Your final response to the coordinator MUST be a simple confirmation message, like 'Report formatting complete and posted to the board for task [task_id].'"
     ),
     tools=[
         status_board_updater_tool,
     ],
 )
 
-print(f"Agent '{report_formatting_specialist.name}' created.")
+print(f"Agent '{report_formatting_specialist.name}' created with corrected tools.")

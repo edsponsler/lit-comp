@@ -5,54 +5,134 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CIE Report Generator</title>
     <style>
-         body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; } 
-         .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); } 
-         textarea { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; } 
-         button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; } 
-         button:hover { background-color: #0056b3; } 
-         #results { margin-top: 20px; padding: 15px; border: 1px solid #eee; border-radius: 4px; background-color: #f9f9f9; white-space: pre-wrap; } /* pre-wrap helps render Markdown-like text */ 
-        .loading { font-style: italic; color: #777; } 
+         body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+         .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+         textarea { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+         button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; }
+         button:hover { background-color: #0056b3; }
+         button:disabled { background-color: #cccccc; cursor: not-allowed; }
+         #status-div { margin-top: 15px; padding: 10px; border-radius: 4px; background-color: #e9ecef; color: #495057; }
+         #results-div { margin-top: 20px; padding: 15px; border: 1px solid #eee; border-radius: 4px; background-color: #f9f9f9; }
+        .loading { font-style: italic; color: #777; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Collaborative Insight Engine</h1>
-        <form id="queryForm">
-            <textarea id="searchQuery" name="query" rows="3" placeholder="Enter your report topic..."></textarea>
-            <button type="submit">Generate Report</button>
+        <form id="analysis-form">
+            <textarea id="query-input" name="query" rows="3" placeholder="Enter your report topic..."></textarea>
+            <button type="submit" id="submit-button">Generate Report</button>
         </form>
+
+        <div id="status-div">
+             <p>Enter a topic above and click "Generate Report".</p>
+        </div>
+
         <h2>Report:</h2>
-        <div id="results">
+        <div id="results-div">
              <p>Your report will appear here.</p>
         </div>
     </div>
+
     <script>
-         document.getElementById('queryForm').addEventListener('submit', async function(event) {
-             event.preventDefault();
-             const query = document.getElementById('searchQuery').value;
-             const resultsDiv = document.getElementById('results');
-             resultsDiv.innerHTML = '<p class="loading">Generating report, please wait...</p>';
-             try {
-                 const response = await fetch('/process', {
-                     method: 'POST',
-                     headers: {
-                         'Content-Type': 'application/json', 
-                     },
-                     body: JSON.stringify({ query: query }),
-                 });
-                 if (!response.ok) { 
-                     const errorData = await response.json(); 
-                     throw new Error(errorData.message || `HTTP error! status: ${response.status}`); 
-                 }
-                 const data = await response.json(); 
-                // If using Marked.js: resultsDiv.innerHTML = marked.parse(data.report); 
-                // For plain text rendering of Markdown: 
-                resultsDiv.innerText = data.report; 
-             } catch (error) {
-                 resultsDiv.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`; 
-                 console.error('Error processing request:', error); 
-             }
-         });
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('analysis-form');
+        const submitButton = document.getElementById('submit-button');
+        const statusDiv = document.getElementById('status-div');
+        const resultsDiv = document.getElementById('results-div');
+        let pollingInterval;
+
+        form.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const query = document.getElementById('query-input').value;
+            if (!query) {
+                statusDiv.textContent = 'Please enter a topic to analyze.';
+                return;
+            }
+
+            submitButton.disabled = true;
+            statusDiv.innerHTML = '<p class="loading">Submitting request...</p>';
+            resultsDiv.innerHTML = '';
+            if (pollingInterval) clearInterval(pollingInterval);
+
+            try {
+                const response = await fetch('/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+
+                if (response.status === 202) {
+                    const data = await response.json();
+                    const taskId = data.task_id;
+                    statusDiv.innerHTML = `<p class="loading">Request accepted! Task ID: ${taskId}. Waiting for processing to start...</p>`;
+                    startPolling(taskId);
+                } else {
+                    const errorData = await response.json();
+                    statusDiv.innerHTML = `<p style="color:red;">Error: ${errorData.message || 'Unknown error occurred.'}</p>`;
+                    submitButton.disabled = false;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<p style="color:red;">Network error: ${error.message}</p>`;
+                submitButton.disabled = false;
+            }
+        });
+
+        function startPolling(taskId) {
+            pollingInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/status/${taskId}`);
+                    if (!response.ok) {
+                        throw new Error(`Status check failed with status ${response.status}`);
+                    }
+                    const result = await response.json();
+
+                    if (result.status === 'success') {
+                        const taskDetails = result.details;
+                        updateStatus(taskDetails);
+
+                        if (taskDetails.status === 'completed') {
+                            clearInterval(pollingInterval);
+                            statusDiv.textContent = 'Analysis complete!';
+                            submitButton.disabled = false;
+                            renderReport(taskDetails.output_payload);
+                        } else if (taskDetails.status === 'error') {
+                            clearInterval(pollingInterval);
+                            statusDiv.innerHTML = `<p style="color:red;">Error processing task: ${taskDetails.error_details || 'An unknown error occurred.'}</p>`;
+                            submitButton.disabled = false;
+                        }
+                    } else {
+                        statusDiv.innerHTML = `<p class="loading">Polling... (${result.message || 'waiting'})</p>`;
+                    }
+                } catch (error) {
+                    clearInterval(pollingInterval);
+                    statusDiv.innerHTML = `<p style="color:red;">Polling error: ${error.message}</p>`;
+                    submitButton.disabled = false;
+                }
+            }, 5000); // Poll every 5 seconds
+        }
+
+        function updateStatus(taskDetails) {
+            let friendlyStatus = `Status: ${taskDetails.status}`;
+            if (taskDetails.status === 'accepted') {
+                friendlyStatus = 'Status: Queued. The analysis will begin shortly.';
+            } else if (taskDetails.status === 'processing') {
+                friendlyStatus = 'Status: Processing... The analysis is now running. Please be patient. This may take 3-5 minutes.';
+            }
+            statusDiv.innerHTML = `<p class="loading">${friendlyStatus}</p>`;
+        }
+        
+        function renderReport(payload) {
+            resultsDiv.innerHTML = '';
+            // The final payload now has a 'report' key with the formatted text
+            if (payload && payload.report) {
+                 // Using innerText to render the string as-is, preserving Markdown newlines
+                resultsDiv.innerText = payload.report;
+            } else {
+                resultsDiv.innerHTML = '<p style="color:red;">Report data is missing or invalid.</p>';
+            }
+        }
+    });
     </script>
 </body>
 </html>

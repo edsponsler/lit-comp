@@ -23,4 +23,4 @@ ENV GOOGLE_GENAI_USE_VERTEXAI=TRUE
 # Set the environment variable for Flask
 # CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "8", "--preload", "app:app"]
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "8", "--timeout", "240", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "8", "--timeout", "300", "--preload", "app:app"]

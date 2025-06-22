@@ -1,54 +1,33 @@
 # cie_core/agents/information_retrieval_specialist.py
+
 from google.adk.agents import Agent
+from google.adk.tools import FunctionTool
 from cie_core.config import DEFAULT_AGENT_MODEL
-from cie_core.tools.status_board_tool import status_board_updater_tool
-from cie_core.tools.search_tools import search_tool
+from decon.data_analysis.tools.micro_task_board_tool import post_micro_entry
+from cie_core.tools.search_tools import simple_web_search_tool
+
+status_board_updater_tool = FunctionTool(post_micro_entry)
 
 information_retrieval_specialist = Agent(
     name="InformationRetrievalSpecialist_v1",
     model=DEFAULT_AGENT_MODEL,
-    description=(
-        "Specializes in finding and retrieving textual information from the web "
-        "based on a given topic or query. It updates a central status board "
-        "with its progress and results."
-    ),
+    description="A specialist agent that retrieves information from the web and posts the findings to a shared task board.",
     instruction=(
-        "You are an Information Retrieval Specialist. Your primary task is to find relevant "
-        "information on a given topic using a search tool and report your findings. "
-        "You will receive a task description, a `session_id`, and a `task_id` from the Coordinator. "
-        "These `session_id` and `task_id` are CRITICAL and MUST be used in all status updates.\n"
-        "\nYour sequential steps are:\n"
-        "1. Acknowledge the request. Immediately update your status on the Agent Status Board using the `status_board_updater_tool`. "
-        "Set your `status` to 'processing_request'. This call MUST include the `agent_id` ('InformationRetrievalSpecialist_v1'), "
-        "the `session_id`, and the `task_id` you received. Include `status_details` like 'Starting to find information on [topic]'.\n"
-        
-        "2. Formulate a search query. The query should be the main subject of the task description only. Do not add modifiers like 'trends', 'applications', or 'challenges'. For example, if the request is 'Find information on the Hubble Space Telescope', your search query should be exactly 'Hubble Space Telescope'.\n"
-        
-        "3. Execute the search. Use the `search_tool` with your formulated query. This tool will perform the web search and scrape content. "
-        "Expect the `search_tool` to return a dictionary. If successful, this dictionary will have a 'data' key containing a 'results' list. "
-        "Each item in this 'results' list is a dictionary with 'url', 'title', and 'content' (the scraped text).\n"
-        
-        "4. Process search results and report completion: "
-        "   a. Check the result from `search_tool`. If the `search_tool` call was successful and returned data, extract the list of search result dictionaries (the value associated with the 'results' key within the 'data' key).\n"
-        "   b. Immediately call the `status_board_updater_tool` again to set your `status` to 'completed_task'. "
-        "      This call MUST include:\n"
-        "      - Your `agent_id` ('InformationRetrievalSpecialist_v1').\n"
-        "      - The `session_id` and `task_id`.\n"
-        "      - An `output_references` argument. The value for this argument MUST be a list containing a single dictionary, structured exactly as: "
-        "`[{'type': 'retrieved_data', 'content': <the_actual_list_of_search_result_dicts_from_search_tool>}]`. "
-        "Replace `<the_actual_list_of_search_result_dicts_from_search_tool>` with the actual list of result dictionaries you extracted in step 4a.\n"
-        "      - `status_details` such as 'Successfully retrieved and processed data for [topic]'.\n"
-
-        "5. Handle errors: If the `search_tool` returns an error status (e.g., its 'status' field is 'error'), or if any other critical error occurs during your process, "
-        "you MUST call `status_board_updater_tool` to set your `status` to 'error_occurred'. "
-        "This call MUST include your `agent_id`, `session_id`, `task_id`, and detailed `status_details` explaining the error.\n"
-
-        "6. Final confirmation: After you have successfully called `status_board_updater_tool` in step 4b (for 'completed_task') or step 5 (for 'error_occurred'), "
-        "your absolute final response for this turn MUST be a brief confirmation message to the Coordinator. "
-        "This message should include the `task_id` and a short summary of what you did (e.g., 'Retrieved and processed N articles for task [task_id]. Results uploaded to status board.') "
-        "or a clear statement if an error occurred and was reported (e.g., 'Error occurred during search for task [task_id]. Details on status board.'). "
-        "Do not output the actual data in this final message; it should only be in the `output_references` on the status board."
+        "You are an Information Retrieval Specialist. Your task is to find and gather information on a given topic.\n"
+        "You will be given a `user_query`, a `session_id`, and a `task_id` for your specific retrieval job.\n"
+        "Your steps are:\n"
+        "1.  Acknowledge the task. Immediately use the `post_micro_entry` tool. For this first call, you MUST provide the `task_id` you were given as the `entry_id` argument, and set the `status` to 'processing_request'.\n"
+        "2.  Use the `simple_web_search_tool` to find relevant information based on the `user_query`.\n"
+        "3.  Once you have the search results, you MUST use the `post_micro_entry` tool a second time to post your findings. For this second call:\n"
+        "    -   You MUST use the exact same `task_id` from the initial request in the `entry_id` argument to ensure you are updating the correct task.\n"
+        "    -   Set the `status` to 'completed_task'.\n"
+        "    -   Place the entire list of search result dictionaries directly into the `output_payload_dict` argument.\n"
+        "4.  Your final response to the coordinator MUST be a simple confirmation message, like 'Information retrieved and posted to the board.'"
     ),
-    tools=[search_tool, status_board_updater_tool],
+    tools=[
+        status_board_updater_tool,
+        simple_web_search_tool
+    ],
 )
-print(f"Agent '{information_retrieval_specialist.name}' created.")
+
+print(f"Agent '{information_retrieval_specialist.name}' created with corrected tools.")

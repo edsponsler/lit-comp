@@ -2,18 +2,14 @@
 import os
 import requests
 from bs4 import BeautifulSoup
-from dotenv import load_dotenv
 from google.adk.tools import FunctionTool
-
-# Load environment variables from .env file
-load_dotenv()
 
 CUSTOM_SEARCH_API_KEY = os.getenv("CUSTOM_SEARCH_API_KEY")
 CUSTOM_SEARCH_ENGINE_ID = os.getenv("CUSTOM_SEARCH_ENGINE_ID")
 GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT") # For ADK
 
 # Number of search results to process
-NUM_SEARCH_RESULTS = 3 # Let's start with 3; try to find a max that works well without hitting API limits
+NUM_SEARCH_RESULTS = 3 # try to find a max that works well without hitting API limits
 MAX_CONTENT_LENGTH = 1500 # Max characters to extract per page
 
 def simple_web_search(query: str) -> dict:
@@ -114,7 +110,6 @@ def simple_web_search(query: str) -> dict:
         print(f"--- Tool: An unexpected error occurred in simple_web_search: {e_gen} ---")
         return {"status": "error", "message": f"An unexpected error occurred: {e_gen}"}
 
-# Re-initialize the FunctionTool with the new simple_web_search function
-search_tool = FunctionTool(simple_web_search)
+simple_web_search_tool = FunctionTool(simple_web_search)
 
 print("SearchTool (simple_web_search - REAL with scraping) defined.")
