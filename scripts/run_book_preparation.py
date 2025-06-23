@@ -6,12 +6,25 @@ import asyncio
 import argparse
 import uuid
 
+# --- THE FIX: Initialize Vertex AI at the very top ---
+# This must run before any other project modules are imported.
+import vertexai
+try:
+    PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
+    REGION = "us-central1"
+    vertexai.init(project=PROJECT_ID, location=REGION)
+    print(f"--- Vertex AI Initialized for Project: {PROJECT_ID} ---")
+except Exception as e:
+    print(f"--- CRITICAL: Failed to initialize Vertex AI in run_book_preparation.py. {e} ---")
+    sys.exit(1) # Exit if initialization fails
+# --------------------------------------------------
+
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from google.genai.types import Content, Part  # <-- Import Content and Part
+from google.genai.types import Content, Part
 from literary_companion.agents.book_preparation_coordinator_v1 import book_preparation_coordinator
 
 async def main(bucket_name: str, file_name: str):
@@ -36,30 +49,24 @@ async def main(bucket_name: str, file_name: str):
         app_name=app_name, user_id=user_id, session_id=session_id
     )
 
-    # Define the initial message as a simple string
     initial_message_text = (
         f"Please prepare the novel located in the bucket '{bucket_name}' "
         f"with the filename '{file_name}'."
     )
-
-    # Wrap the string in the required Content object structure
     initial_message = Content(role="user", parts=[Part(text=initial_message_text)])
 
-    # Run the agent asynchronously and handle events
     async for event in runner.run_async(
         user_id=user_id,
         session_id=session_id,
         new_message=initial_message
     ):
-        # Check for a tool call by inspecting the event's contents
         is_tool_call_event = (
-            event.content  # <-- Access the content of the event
+            event.content
             and event.content.parts
             and event.content.parts[0].function_call
         )
 
         if event.is_final_response():
-            # Add a check to ensure content exists before accessing it.
             if event.content and event.content.parts:
                 final_text = event.content.parts[0].text
                 print("\n--- Agent Final Response ---")
@@ -76,5 +83,10 @@ if __name__ == "__main__":
     parser.add_argument("--bucket", required=True, help="The GCS bucket name.")
     parser.add_argument("--file", required=True, help="The GCS file name of the novel's text.")
     args = parser.parse_args()
+
+    # Ensure the required environment variable is set.
+    if not os.environ.get("GOOGLE_CLOUD_PROJECT"):
+        print("ERROR: The GOOGLE_CLOUD_PROJECT environment variable must be set.")
+        sys.exit(1)
 
     asyncio.run(main(args.bucket, args.file))
