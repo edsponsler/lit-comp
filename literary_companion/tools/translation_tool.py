@@ -1,7 +1,7 @@
 # literary_companion/tools/translation_tool.py
 
 from vertexai.generative_models import GenerativeModel
-from cie_core.config import DEFAULT_AGENT_MODEL
+from literary_companion.config import DEFAULT_AGENT_MODEL
 
 
 def translate_text(text: str) -> str:

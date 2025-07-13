@@ -1,7 +1,7 @@
 # literary_companion/agents/book_preparation_coordinator_v1.py
 
 from google.adk.agents import Agent
-from cie_core.config import DEFAULT_AGENT_MODEL
+from literary_companion.config import DEFAULT_AGENT_MODEL
 
 # We ONLY need to import the single tool the agent uses.
 # The old imports for gcs_tool and translation_tool are no longer needed here.

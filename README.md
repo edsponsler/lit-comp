@@ -131,17 +131,15 @@ To run the Flask application locally for development:
 
 ## Application Overview
 
-The application consists of two main parts:
+The application is a **Literary Companion** that enhances the experience of reading classic novels. It provides readers with contextually relevant "fun facts" about the content being read.
 
-1.  **CIE Core (`cie_core/`)**:
-    *   Provides a web interface (`/`) for users to submit queries.
-    *   Uses a `coordinator_agent` to process these queries and generate reports.
-    *   Interacts with Google Cloud services (e.g., Vertex AI, Firestore via `status_board_tool`).
+The main components are:
 
-2.  **Literary Companion (`literary_companion/`)**:
-    *   Provides a web interface (`/literary_companion`) for literary-related functionalities.
-    *   Features a `fun_fact_coordinator_v1` agent to generate fun facts based on text segments.
-    *   Includes tools for interacting with Google Cloud Storage (`gcs_tool.py`) and other utilities.
-    *   An API endpoint (`/api/get_novel_content`) proxies requests to fetch novel content from GCS.
+*   **Web Interface (`/literary_companion`)**: A user interface for reading novels and viewing fun facts.
+*   **Backend (`app.py`)**: A Flask application that serves the UI and provides APIs for fetching novel content and generating fun facts.
+*   **Fun Fact Generation (`literary_companion/`)**: This module contains the core logic for the application.
+    *   It uses a `FunFactCoordinator_v1` agent to generate fun facts based on text segments.
+    *   It includes tools for interacting with Google Cloud Storage (`gcs_tool.py`) to read prepared novel content.
+    *   An API endpoint (`/api/get_novel_content`) proxies requests to fetch novel content from GCS, and another (`/generate_fun_facts`) triggers the fun fact generation.
 
-Both modules leverage the Google ADK (Agent Development Kit) for building and running agents. The `app.py` file manages Flask routing, agent initialization, and asynchronous request handling.
+The project leverages the Google ADK (Agent Development Kit) for building and running the fun fact agent. The `app.py` file manages Flask routing, agent initialization, and asynchronous request handling.

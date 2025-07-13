@@ -1,7 +1,7 @@
 # literary_companion/agents/fun_fact_coordinator_v1.py
 
 from google.adk.agents import Agent
-from cie_core.config import DEFAULT_AGENT_MODEL
+from literary_companion.config import DEFAULT_AGENT_MODEL
 
 # We import the single, powerful tool this agent is allowed to use.
 from literary_companion.tools.fun_fact_orchestrator import fun_fact_orchestrator_tool

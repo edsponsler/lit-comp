@@ -1,7 +1,7 @@
 # literary_companion/lib/fun_fact_generators.py
 
 from vertexai.generative_models import GenerativeModel
-from cie_core.config import DEFAULT_AGENT_MODEL
+from literary_companion.config import DEFAULT_AGENT_MODEL
 
 
 def _generate_fact(instruction: str, text: str) -> dict:
