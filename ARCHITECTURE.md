@@ -61,7 +61,7 @@ These tools provide specific functionalities used by the agents or other parts o
 *   **`translation_tool.py`:**
     *   **Role:** Provides text translation capability, specifically for converting classic literary language into modern, easily understandable English.
     *   **Key Functions/Tools:**
-        *   `translate_text(text)`: Takes a string of text. Uses a generative AI model (Vertex AI, via `DEFAULT_AGENT_MODEL` from `literary_companion.config`) to perform a stylistic translation/rephrasing. It's not translating between different languages but rather modernizing the English style. Used by `process_and_translate_book`.
+        *   `translate_text(text)`: Takes a string of text. Uses a generative AI model (Vertex AI, using the model specified by the `DEFAULT_AGENT_MODEL` environment variable, loaded from `literary_companion.config`) to perform a stylistic translation/rephrasing. It's not translating between different languages but rather modernizing the English style. Used by `process_and_translate_book`.
 
 *   **`fun_fact_orchestrator.py`:**
     *   **Role:** Manages the entire multi-step process of generating a set of fun facts for a given text segment. This is a deterministic Python workflow, not an AI agent.
@@ -94,7 +94,7 @@ These are supporting Python libraries that contain core business logic.
         *   Provides a set of functions, each named `analyze_<category>(text)` (e.g., `analyze_historical_context`, `analyze_character_sentiments`).
         *   Each function takes the text segment as input.
         *   Constructs a specific prompt tailored to the fact category.
-        *   Makes a direct call to a generative AI model (Vertex AI, using `DEFAULT_AGENT_MODEL`) with the prompt and text to generate the fun fact.
+        *   Makes a direct call to a generative AI model (Vertex AI, using the model specified by the `DEFAULT_AGENT_MODEL` environment variable) with the prompt and text to generate the fun fact.
         *   Returns a dictionary containing the status and the generated fact text.
         *   These functions are called by the `fun_fact_orchestrator_tool`.
 
@@ -222,7 +222,7 @@ The Literary Companion module leverages several key Python libraries and Google 
 
 *   **Google Agent Development Kit (google-adk):** Used for the `BookPreparationCoordinator_v1` and `FunFactCoordinator_v1` agents, enabling them to be invoked via the ADK Runner and to use ADK Tools (`FunctionTool`).
 *   **Flask (Flask\[async]):** The main web framework used by `app.py` to serve the `literary_companion.html` page and provide the API endpoints (`/api/get_novel_content`, `/generate_fun_facts`).
-*   **Google Cloud Vertex AI:** Directly used by `literary_companion.lib.fun_fact_generators.py` and `literary_companion.tools.translation_tool.py` to interact with generative AI models (specified by `DEFAULT_AGENT_MODEL` from `literary_companion.config`) for generating fun facts and modern English translations.
+*   **Google Cloud Vertex AI:** Directly used by `literary_companion.lib.fun_fact_generators.py` and `literary_companion.tools.translation_tool.py` to interact with generative AI models (specified by the `DEFAULT_AGENT_MODEL` environment variable, which is loaded in `literary_companion.config`) for generating fun facts and modern English translations.
 *   **Google Cloud Storage (GCS):** Used for storing original novel text files and the processed JSON files containing original and translated paragraphs. Accessed via `google-cloud-storage` library in `gcs_tool.py`.
 *   **Google Cloud Firestore:** Used by `fun_fact_micro_task_board_tool.py` to implement the `fun_fact_micro_task_board` collection. This provides a basic task tracking and results storage mechanism for the `fun_fact_orchestrator_tool`. Accessed via `google-cloud-firestore` library.
 *   **Python Standard Libraries:**

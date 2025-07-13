@@ -1,13 +1,22 @@
-# ~/projects/cie-0/.dockerignore
-Dockerfile
-.dockerignore
+# Git
 .git
 .gitignore
+
+# Docker
+.dockerignore
+Dockerfile
+
+# Environment
 .venv/
+.env
+gcenv.sh
+
+# Python cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# IDE and OS specific
 .vscode/
 .DS_Store
-*.md

@@ -15,6 +15,7 @@ BASE_DOCKER_IMAGE_NAME="webapp"     # The base name for your Docker images
 BASE_SERVICE_NAME="public-ui"       # The base name for your Cloud Run services
 GCS_BUCKET_NAME="lit-comp-1171089-literary-companion-assets" # The GCS bucket for novel files
 GCS_FILE_NAME="pg2701-moby-dick-all.txt" # The default GCS file to process
+GCP_GENERATIVE_MODEL="gemini-2.5-flash" # The Vertex AI model for agents and tools
 
 # --- SCRIPT LOGIC ---
 # Check if an identifier was passed as an argument
@@ -36,6 +37,7 @@ export IMAGE_NAME="${BASE_DOCKER_IMAGE_NAME}-${APP_IDENTIFIER}"
 export SERVICE_NAME="${BASE_SERVICE_NAME}-${APP_IDENTIFIER}"
 export GCS_BUCKET_NAME="${GCS_BUCKET_NAME}"
 export GCS_FILE_NAME="${GCS_FILE_NAME}"
+export DEFAULT_AGENT_MODEL="${GCP_GENERATIVE_MODEL}"
 
 # --- THE FIX: Set the active gcloud project configuration ---
 gcloud config set project "${PROJECT_ID}"
@@ -53,4 +55,5 @@ echo "IMAGE_NAME:   ${IMAGE_NAME}"
 echo "SERVICE_NAME: ${SERVICE_NAME}"
 echo "GCS_BUCKET_NAME: ${GCS_BUCKET_NAME}"
 echo "GCS_FILE_NAME:   ${GCS_FILE_NAME}"
+echo "DEFAULT_AGENT_MODEL: ${DEFAULT_AGENT_MODEL}"
 echo "VERTEXAI_MODE:${GOOGLE_GENAI_USE_VERTEXAI}"

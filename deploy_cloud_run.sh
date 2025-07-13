@@ -42,18 +42,31 @@ gcloud run deploy "${SERVICE_NAME}" \
     --set-env-vars="GCS_BUCKET_NAME=${GCS_BUCKET_NAME}" \
     --set-env-vars="GCS_FILE_NAME=${GCS_FILE_NAME}" \
     --set-env-vars="GOOGLE_GENAI_USE_VERTEXAI=TRUE" \
-    --set-secrets="CUSTOM_SEARCH_API_KEY=custom-search-api-key:latest" \
-    --set-secrets="CUSTOM_SEARCH_ENGINE_ID=custom-search-engine-id:latest"
+    --set-env-vars="DEFAULT_AGENT_MODEL=${DEFAULT_AGENT_MODEL}"
 
 # Check deployment status
 if [ $? -eq 0 ]; then 
     echo ""
     echo "Deployment command executed successfully for service [${SERVICE_NAME}]." 
-    echo "Check the output above for the service URL and status." 
+    echo "Check the output above for the service URL and status."
+
+    # --- Post-Deployment: Display Service Account for IAM Configuration ---
+    SERVICE_ACCOUNT=$(gcloud run services describe "${SERVICE_NAME}" --platform="managed" --region="${LOCATION}" --project="${PROJECT_ID}" --format="value(spec.template.spec.serviceAccountName)")
+
+    if [ -n "$SERVICE_ACCOUNT" ]; then
+        echo ""
+        echo "--- ACTION REQUIRED ---"
+        echo "Ensure the Cloud Run service account has the necessary IAM roles."
+        echo "Service Account: ${SERVICE_ACCOUNT}"
+        echo "Required Roles:"
+        echo "  - Vertex AI User (for GenAI calls)"
+        echo "  - Cloud Datastore User (for Firestore access)"
+        echo "  - Storage Object Admin (for GCS access)"
+        echo "-----------------------"
+    fi
 else
     echo "" 
     echo "ERROR: Deployment command failed. Check the error messages above." 
     exit 1 
 fi
-
 exit 0
