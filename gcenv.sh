@@ -8,11 +8,13 @@
 # Example: source gcenv.sh lit-comp
 
 # --- USER CONFIGURATION (BASE NAMES) ---
-GCP_PROJECT_ID="cie-0-867530"        # Your Google Cloud Project ID
-GCP_REGION="us-central1"          # Your Google Cloud region
-ARTIFACT_REPO_NAME="cie-repo"           # Your Artifact Registry repository name
-BASE_DOCKER_IMAGE_NAME="cie-webapp"     # The base name for your Docker images
-BASE_SERVICE_NAME="cie-public-ui"       # The base name for your Cloud Run services
+GCP_PROJECT_ID="lit-comp-1171089"        # Your Google Cloud Project ID
+GCP_LOCATION="us-central1"          # Your Google Cloud location/region
+ARTIFACT_REPO_NAME="lit-comp-repo"           # Your Artifact Registry repository name
+BASE_DOCKER_IMAGE_NAME="webapp"     # The base name for your Docker images
+BASE_SERVICE_NAME="public-ui"       # The base name for your Cloud Run services
+GCS_BUCKET_NAME="lit-comp-1171089-literary-companion-assets" # The GCS bucket for novel files
+GCS_FILE_NAME="pg2701-moby-dick-all.txt" # The default GCS file to process
 
 # --- SCRIPT LOGIC ---
 # Check if an identifier was passed as an argument
@@ -26,23 +28,29 @@ APP_IDENTIFIER="$1"
 
 # Export the variables with the unique identifier appended
 export PROJECT_ID="${GCP_PROJECT_ID}"
-export GOOGLE_CLOUD_PROJECT="${GCP_PROJECT_ID}" # Also export this for ADK/Vertex
-export REGION="${GCP_REGION}"
-export GOOGLE_CLOUD_LOCATION="${GCP_REGION}"
+export GOOGLE_CLOUD_PROJECT="${GCP_PROJECT_ID}" # For ADK/Vertex and other libraries
+export LOCATION="${GCP_LOCATION}"               # For gcloud commands (e.g., --region)
+export GOOGLE_CLOUD_LOCATION="${GCP_LOCATION}"  # For Python client libraries
 export REPO_NAME="${ARTIFACT_REPO_NAME}"
 export IMAGE_NAME="${BASE_DOCKER_IMAGE_NAME}-${APP_IDENTIFIER}"
 export SERVICE_NAME="${BASE_SERVICE_NAME}-${APP_IDENTIFIER}"
+export GCS_BUCKET_NAME="${GCS_BUCKET_NAME}"
+export GCS_FILE_NAME="${GCS_FILE_NAME}"
+
+# --- THE FIX: Set the active gcloud project configuration ---
+gcloud config set project "${PROJECT_ID}"
 
 # --- THE FIX: Add the critical environment variable for Vertex AI mode ---
 export GOOGLE_GENAI_USE_VERTEXAI=TRUE
 
 # Confirmation message
 echo "Google Cloud environment variables set for '${APP_IDENTIFIER}':"
-echo "PROJECT_ID:   ${PROJECT_ID}"
-echo "GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT}"
-echo "REGION:       ${REGION}"
+echo "PROJECT_ID: ${PROJECT_ID}"
+echo "LOCATION:   ${LOCATION}"
 echo "GOOGLE_CLOUD_LOCATION: ${GOOGLE_CLOUD_LOCATION}"
 echo "REPO_NAME:    ${REPO_NAME}"
 echo "IMAGE_NAME:   ${IMAGE_NAME}"
 echo "SERVICE_NAME: ${SERVICE_NAME}"
+echo "GCS_BUCKET_NAME: ${GCS_BUCKET_NAME}"
+echo "GCS_FILE_NAME:   ${GCS_FILE_NAME}"
 echo "VERTEXAI_MODE:${GOOGLE_GENAI_USE_VERTEXAI}"

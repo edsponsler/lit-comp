@@ -2,11 +2,15 @@
 
 import datetime
 import uuid
+import logging
 from typing import Any, Dict, List, Optional
 from google.cloud import firestore
 
 # The collection name is specific to our new module, as per the outline 
 MICRO_TASK_BOARD_COLLECTION = "fun_fact_micro_task_board"
+
+# Configure logging for structured output
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def _get_firestore_client():
     """Helper to get the Firestore client."""
@@ -14,7 +18,7 @@ def _get_firestore_client():
         db = firestore.Client()
         return db
     except Exception as e:
-        print(f"--- Tool: Error initializing Firestore client: {e} ---")
+        logging.error("Error initializing Firestore client.", exc_info=True)
         return None
 
 def _make_serializable(data: Any) -> Any:
@@ -61,7 +65,7 @@ def post_micro_entry(
         doc_ref.set(log_data, merge=True)
         return {"status": "success", "entry_id": doc_id}
     except Exception as e:
-        print(f"--- Tool: Error posting to micro-task board: {e} ---")
+        logging.error("Error posting to micro-task board.", exc_info=True)
         return {"status": "error", "message": str(e)}
 
 def get_micro_entries(
@@ -84,5 +88,5 @@ def get_micro_entries(
         results = [doc.to_dict() for doc in query.stream()]
         return {"status": "success", "entries": _make_serializable(results)}
     except Exception as e:
-        print(f"--- Tool: Error getting from micro-task board: {e} ---")
+        logging.error("Error getting from micro-task board.", exc_info=True)
         return {"status": "error", "message": str(e), "entries": []}

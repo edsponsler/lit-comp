@@ -1,19 +1,7 @@
 # literary_companion/lib/fun_fact_generators.py
 
-import os
-import vertexai
 from vertexai.generative_models import GenerativeModel
 from cie_core.config import DEFAULT_AGENT_MODEL
-
-# --- Initialize the Vertex AI library ---
-# It will automatically use your gcloud credentials and project settings.
-try:
-    PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
-    REGION = "us-central1" # Or your preferred region
-    vertexai.init(project=PROJECT_ID, location=REGION)
-except Exception as e:
-    print(f"--- CRITICAL: Failed to initialize Vertex AI. Check GOOGLE_CLOUD_PROJECT env var. {e} ---")
-# -------------------------------------------------
 
 
 def _generate_fact(instruction: str, text: str) -> dict:

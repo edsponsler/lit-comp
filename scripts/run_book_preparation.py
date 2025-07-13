@@ -6,21 +6,10 @@ import asyncio
 import argparse
 import uuid
 
-# --- THE FIX: Initialize Vertex AI at the very top ---
-# This must run before any other project modules are imported.
-import vertexai
-try:
-    PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
-    REGION = "us-central1"
-    vertexai.init(project=PROJECT_ID, location=REGION)
-    print(f"--- Vertex AI Initialized for Project: {PROJECT_ID} ---")
-except Exception as e:
-    print(f"--- CRITICAL: Failed to initialize Vertex AI in run_book_preparation.py. {e} ---")
-    sys.exit(1) # Exit if initialization fails
-# --------------------------------------------------
-
-# Add the project root to the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# The Vertex AI library is initialized automatically by the client libraries
+# reading the GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION environment
+# variables, which are set in the cloudbuild.yaml file. No explicit
+# vertexai.init() call is needed here.
 
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -31,6 +20,8 @@ async def main(bucket_name: str, file_name: str):
     """
     Runs the BookPreparationCoordinator_v1 agent to process a novel.
     """
+    # Print the environment variables to confirm they are set correctly in the build
+    print(f"--- Using Project: {os.environ.get('GOOGLE_CLOUD_PROJECT')} Location: {os.environ.get('GOOGLE_CLOUD_LOCATION')} ---")
     print(f"--- Starting preparation for gs://{bucket_name}/{file_name} ---")
 
     app_name = "literary-companion-preparer"
@@ -65,6 +56,12 @@ async def main(bucket_name: str, file_name: str):
             and event.content.parts
             and event.content.parts[0].function_call
         )
+        is_text_event = (
+            event.content
+            and event.content.parts
+            and event.content.parts[0].text
+            and not event.is_final_response()
+        )
 
         if event.is_final_response():
             if event.content and event.content.parts:
@@ -73,7 +70,10 @@ async def main(bucket_name: str, file_name: str):
                 print(final_text)
                 print("--------------------------\n")
         elif is_tool_call_event:
-             print(f"--- Calling Tool: {event.content.parts[0].function_call.name} ---")
+            print(f"--- Calling Tool: {event.content.parts[0].function_call.name} ---")
+        elif is_text_event:
+            thought_text = event.content.parts[0].text.strip()
+            print(f"--- Agent thought: \"{thought_text}\" ---")
 
     print("--- Preparation script finished. ---")
 

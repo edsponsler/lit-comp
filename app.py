@@ -2,6 +2,7 @@ import asyncio
 import uuid
 import json
 import os
+import vertexai
 from flask import Flask, render_template, request, jsonify
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -17,12 +18,11 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Ensure GOOGLE_CLOUD_PROJECT is set for ADK and Firestore client initialization
-# The ADK might try to initialize clients (like for Vertex AI) when agents are imported
-# or when the Runner is created. Firestore client is used by status_board_tool.
-if not os.getenv("GOOGLE_CLOUD_PROJECT"): 
-    print("CRITICAL: GOOGLE_CLOUD_PROJECT environment variable not set.") 
-    # Consider raising an error or exiting if this is critical for startup
+# The Vertex AI library is initialized automatically by the client libraries
+# reading the GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION environment
+# variables. These are set for the Cloud Run service in deploy_cloud_run.sh.
+# No explicit vertexai.init() call is needed here.
+
 
 # Initialize session service for the Coordinator Agent (can be a global instance for the app)
 # Note: InMemorySessionService is per-instance. If Cloud Run scales to multiple instances,
@@ -163,20 +163,20 @@ def get_novel_content():
     """
     Acts as a secure proxy to fetch prepared novel content from GCS.
     """
-    # In a real app, you might pass bucket/file as query params
-    # For now, we can hardcode it or use environment variables
-    bucket_name = os.environ.get("GCS_BUCKET_NAME") # Example: use an env var
-    file_name = os.environ.get("GCS_FILE_NAME")     # Example: use an env var
+    # These environment variables are set by the Cloud Run service configuration
+    bucket_name = os.environ.get("GCS_BUCKET_NAME")
+    source_file_name = os.environ.get("GCS_FILE_NAME")
 
-    if not all([bucket_name, file_name]):
-        # Fallback for simplicity in our tutorial
-        bucket_name = "cie-0-867530-literary-companion-assets"
-        file_name = "pg2701-moby-dick_ch01_prepared.json"
+    if not all([bucket_name, source_file_name]):
+        return jsonify({"error": "Server is not configured with GCS_BUCKET_NAME and GCS_FILE_NAME."}), 500
 
-    print(f"--- API Proxy: Fetching gs://{bucket_name}/{file_name} ---")
+    # Construct the name of the prepared file based on the source file name
+    prepared_file_name = source_file_name.replace('.txt', '_prepared.json')
+
+    print(f"--- API Proxy: Fetching gs://{bucket_name}/{prepared_file_name} ---")
     
     # Use the robust tool function we already wrote
-    content = read_text_from_gcs(bucket_name, file_name)
+    content = read_text_from_gcs(bucket_name, prepared_file_name)
 
     if content.startswith("Error:"):
         return jsonify({"error": content}), 500

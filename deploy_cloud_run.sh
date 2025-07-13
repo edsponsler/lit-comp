@@ -6,8 +6,8 @@
 # --- Verification ---
 echo ""
 echo "--- Verifying Deployment Configuration from Sourced Environment ---" 
-echo "Project ID:             ${PROJECT_ID}" 
-echo "Region:                 ${REGION}" 
+echo "Project ID:             ${PROJECT_ID}"
+echo "Location:               ${LOCATION}"
 echo "Docker Image Name:      ${IMAGE_NAME}" 
 echo "Cloud Run Service Name: ${SERVICE_NAME}" 
 echo "----------------------------------------------------------------" 
@@ -30,15 +30,17 @@ echo ""
 echo "Deploying to Cloud Run..." 
 
 gcloud run deploy "${SERVICE_NAME}" \
-    --image="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:latest" \
+    --image="${LOCATION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:latest" \
     --platform="managed" \
-    --region="${REGION}" \
+    --region="${LOCATION}" \
     --allow-unauthenticated \
     --project="${PROJECT_ID}" \
     --cpu=2 \
     --memory=2Gi \
     --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID}" \
-    --set-env-vars="GOOGLE_CLOUD_LOCATION=${REGION}" \
+    --set-env-vars="GOOGLE_CLOUD_LOCATION=${LOCATION}" \
+    --set-env-vars="GCS_BUCKET_NAME=${GCS_BUCKET_NAME}" \
+    --set-env-vars="GCS_FILE_NAME=${GCS_FILE_NAME}" \
     --set-env-vars="GOOGLE_GENAI_USE_VERTEXAI=TRUE" \
     --set-secrets="CUSTOM_SEARCH_API_KEY=custom-search-api-key:latest" \
     --set-secrets="CUSTOM_SEARCH_ENGINE_ID=custom-search-engine-id:latest"

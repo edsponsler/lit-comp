@@ -102,13 +102,8 @@
     </div>
 
     <script>
-        // --- CONFIGURATION ---
-        // In a real application, you would get this from the server or a config file.
-        // Replace with your bucket and the path to your prepared chapter file.
-        const BUCKET_NAME = "cie-0-867530-literary-companion-assets";
-        const FILE_NAME = "pg2701-moby-dick_ch01_prepared.json";
-        const GCS_URL = `https://storage.googleapis.com/${BUCKET_NAME}/${FILE_NAME}`;
-        // We no longer call GCS directly from the browser.
+        // --- API CONFIGURATION ---
+        // The client fetches novel content from our own backend API, which acts as a proxy.
         // We call our own backend API endpoint.
         const NOVEL_API_URL = "/api/get_novel_content";
 
