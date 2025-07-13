@@ -5,6 +5,7 @@ import uuid
 import logging
 from typing import Any, Dict, List, Optional
 from google.cloud import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 # The collection name is specific to our new module, as per the outline 
 MICRO_TASK_BOARD_COLLECTION = "fun_fact_micro_task_board"
@@ -79,11 +80,13 @@ def get_micro_entries(
         return {"status": "error", "message": "Firestore client not available."}
 
     try:
-        query = db.collection(MICRO_TASK_BOARD_COLLECTION).where("agency_task_id", "==", agency_task_id)
+        # Use FieldFilter to create queries, which is the modern, recommended approach.
+        # This resolves the UserWarning about using positional arguments for .where().
+        query = db.collection(MICRO_TASK_BOARD_COLLECTION).where(filter=FieldFilter("agency_task_id", "==", agency_task_id))
         if status:
-            query = query.where("status", "==", status)
+            query = query.where(filter=FieldFilter("status", "==", status))
         if task_type:
-            query = query.where("task_type", "==", task_type)
+            query = query.where(filter=FieldFilter("task_type", "==", task_type))
 
         results = [doc.to_dict() for doc in query.stream()]
         return {"status": "success", "entries": _make_serializable(results)}

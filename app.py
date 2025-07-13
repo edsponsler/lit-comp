@@ -1,6 +1,7 @@
 import uuid
 import json
 import os
+import vertexai
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -16,7 +17,9 @@ app = Flask(__name__)
 # The Vertex AI library is initialized automatically by the client libraries
 # reading the GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION environment
 # variables. These are set for the Cloud Run service in deploy_cloud_run.sh.
-# No explicit vertexai.init() call is needed here.
+# Calling vertexai.init() explicitly suppresses a deprecation warning and
+# ensures the project and location are correctly configured for all library calls.
+vertexai.init()
 
 @app.route('/')
 def index():
