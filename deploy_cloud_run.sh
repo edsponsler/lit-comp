@@ -1,91 +1,59 @@
 #!/bin/bash
+# deploy_cloud_run.sh 
 
-# Script to deploy the CIE Web Application to Google Cloud Run
+# This script ASSUMES you have already sourced the correct gcenv.sh for your target environment. 
 
-# --- Configuration ---
-# 1. Source environment variables for project, region, repo, and image names
-#    This script assumes gcenv.sh is in the same directory or your project root.
-#    Adjust the path if gcenv.sh is located elsewhere.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_SCRIPT_PATH="${SCRIPT_DIR}/gcenv.sh" # Assumes gcenv.sh is in the same directory
-
-if [ -f "$ENV_SCRIPT_PATH" ]; then
-    echo "Sourcing environment variables from $ENV_SCRIPT_PATH..."
-    # shellcheck source=./gcenv.sh
-    source "$ENV_SCRIPT_PATH"
-else
-    echo "ERROR: Environment script not found at $ENV_SCRIPT_PATH"
-    echo "Please ensure gcenv.sh exists and contains your PROJECT_ID, REGION, REPO_NAME, and IMAGE_NAME."
-    exit 1
-fi
-
-# 2. Define the Cloud Run service name
-# You can change this if you prefer a different service name.
-SERVICE_NAME="cie-public-ui"
-
-# 3. API Keys - IMPORTANT: Handle these securely for production.
-#    For this script, we'll prompt for them.
-#    Alternatively, you can hardcode them here if you understand the risks,
-#    or better yet, use Secret Manager for production deployments.
-
+# --- Verification ---
 echo ""
-echo "You will be prompted for your Google Custom Search API Key and Engine ID."
-echo "These are required for the application to function."
-echo ""
-
-read -r -p "Enter your CUSTOM_SEARCH_API_KEY: " CUSTOM_SEARCH_API_KEY
-read -r -p "Enter your CUSTOM_SEARCH_ENGINE_ID: " CUSTOM_SEARCH_ENGINE_ID
-
-if [ -z "$CUSTOM_SEARCH_API_KEY" ] || [ -z "$CUSTOM_SEARCH_ENGINE_ID" ]; then
-    echo "ERROR: Both Custom Search API Key and Engine ID are required."
-    exit 1
-fi
-
-# --- Verification (Optional but Recommended) ---
-echo ""
-echo "--- Deployment Configuration ---"
+echo "--- Verifying Deployment Configuration from Sourced Environment ---" 
 echo "Project ID:             ${PROJECT_ID}"
-echo "Region:                 ${REGION}"
-echo "Artifact Repo Name:     ${REPO_NAME}"
-echo "Docker Image Name:      ${IMAGE_NAME}"
-echo "Cloud Run Service Name: ${SERVICE_NAME}"
-echo "Image to Deploy:        ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:latest"
-echo "------------------------------"
+echo "Location:               ${LOCATION}"
+echo "Docker Image Name:      ${IMAGE_NAME}" 
+echo "Cloud Run Service Name: ${SERVICE_NAME}" 
+echo "----------------------------------------------------------------" 
 echo ""
 
-read -r -p "Proceed with deployment? (y/N): " confirmation
-if ! [[ "$confirmation" =~ ^[Yy]$ ]]; then
-    echo "Deployment cancelled by user."
-    exit 0
+if [ -z "$PROJECT_ID" ] || [ -z "$SERVICE_NAME" ] || [ -z "$IMAGE_NAME" ]; then 
+    echo "ERROR: Required environment variables (PROJECT_ID, SERVICE_NAME, IMAGE_NAME) are not set." 
+    echo "Please run 'source gcenv.sh <IDENTIFIER>' before running this script." 
+    exit 1 
+fi
+
+read -r -p "Proceed with deploying service '${SERVICE_NAME}'? (y/N): " confirmation
+if ! [[ "$confirmation" =~ ^[Yy]$ ]]; then 
+    echo "Deployment cancelled by user." 
+    exit 0 
 fi
 
 # --- Deployment Command ---
 echo ""
-echo "Deploying to Cloud Run..."
+echo "Deploying to Cloud Run..." 
 
 gcloud run deploy "${SERVICE_NAME}" \
-    --image="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:latest" \
+    --image="${LOCATION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:latest" \
     --platform="managed" \
-    --region="${REGION}" \
+    --region="${LOCATION}" \
     --allow-unauthenticated \
+    --project="${PROJECT_ID}" \
+    --cpu=2 \
+    --memory=2Gi \
     --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID}" \
-    --set-env-vars="GOOGLE_CLOUD_LOCATION=${REGION}" \
+    --set-env-vars="GOOGLE_CLOUD_LOCATION=${LOCATION}" \
+    --set-env-vars="GCS_BUCKET_NAME=${GCS_BUCKET_NAME}" \
+    --set-env-vars="GCS_FILE_NAME=${GCS_FILE_NAME}" \
     --set-env-vars="GOOGLE_GENAI_USE_VERTEXAI=TRUE" \
-    --set-env-vars="CUSTOM_SEARCH_API_KEY=${CUSTOM_SEARCH_API_KEY}" \
-    --set-env-vars="CUSTOM_SEARCH_ENGINE_ID=${CUSTOM_SEARCH_ENGINE_ID}" \
-    --memory="2Gi" \
-    --cpu="1" \
-    --project="${PROJECT_ID}" # Explicitly set project for the gcloud command
+    --set-secrets="CUSTOM_SEARCH_API_KEY=custom-search-api-key:latest" \
+    --set-secrets="CUSTOM_SEARCH_ENGINE_ID=custom-search-engine-id:latest"
 
 # Check deployment status
-if [ $? -eq 0 ]; then
+if [ $? -eq 0 ]; then 
     echo ""
-    echo "Deployment command executed. Check the output above for the service URL and status."
-    echo "It might take a few moments for the service to become fully available."
+    echo "Deployment command executed successfully for service [${SERVICE_NAME}]." 
+    echo "Check the output above for the service URL and status." 
 else
-    echo ""
-    echo "ERROR: Deployment command failed. Check the error messages above."
-    exit 1
+    echo "" 
+    echo "ERROR: Deployment command failed. Check the error messages above." 
+    exit 1 
 fi
 
 exit 0

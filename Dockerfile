@@ -1,34 +1,43 @@
-# Use an official Python runtime as a parent image
-FROM python:3.12-slim
+# Dockerfile
 
-# Set the working directory in the container
-WORKDIR /app
+# --- Stage 1: Builder ---
+# This stage installs dependencies into a virtual environment. Using a separate
+# stage keeps the final image smaller and more secure.
+FROM python:3.12-slim as builder
 
-# Copy the requirements file into the container at /app
+# Create and activate a virtual environment
+ENV VIRTUAL_ENV=/opt/venv
+RUN python -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Install dependencies
 COPY requirements.txt .
-
-# Install any needed packages specified in requirements.txt
-# Ensure google-cloud-cli is NOT installed in the image for Cloud Run,
-# as authentication is handled via the service account.
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code into the container at /app
-# Be mindful of what's copied; .dockerignore can exclude files like .git, .venv, __pycache__
-COPY . .
+# --- Stage 2: Final Image ---
+# This stage copies only the necessary application code and the installed
+# dependencies from the builder stage.
+FROM python:3.12-slim
 
-# Ensure .env is NOT copied if it contains secrets. [cite: 45]
-# These should be set as environment variables in Cloud Run. [cite: 46]
-# The .gitignore should already prevent .env from being committed to git. [cite: 46]
+WORKDIR /app
+
+# Copy the virtual environment from the builder stage
+COPY --from=builder /opt/venv /opt/venv
+
+# Copy only the necessary application code
+COPY app.py .
+COPY cie_core ./cie_core
+COPY literary_companion ./literary_companion
+COPY templates ./templates
+
+# Activate the virtual environment for the running container
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Expose the port the app runs on
 EXPOSE 8080
 
-# Define environment variable for the port (Cloud Run expects 8080 by default)
+# Define environment variable for the port
 ENV PORT=8080
-ENV GOOGLE_GENAI_USE_VERTEXAI=TRUE 
-# Other ENV vars like GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION,
-# CUSTOM_SEARCH_API_KEY, CUSTOM_SEARCH_ENGINE_ID will be set in Cloud Run.
-
-# Run app.py when the container launches using Gunicorn
-# CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--timeout", "180", "app:app"]
-CMD exec gunicorn --bind 0.0.0.0:$PORT --timeout 180 app:app
+ENV GOOGLE_GENAI_USE_VERTEXAI=TRUE
+# Use exec form to properly handle signals and environment variable expansion
+CMD exec gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 8 --preload app:app

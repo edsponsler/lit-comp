@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Literary Companion</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f9;
+        }
+        h1 {
+            text-align: center;
+            padding: 1rem;
+            margin: 0;
+            background-color: #4a4a4a;
+            color: white;
+        }
+        .container {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden;
+            padding: 1rem;
+            gap: 1rem;
+        }
+        .pane {
+            flex: 1;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow-y: scroll;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .pane h2 {
+            position: sticky;
+            top: -17px; /* Adjust based on padding */
+            background: white;
+            padding: 1rem 0;
+            margin-top: -1rem;
+            border-bottom: 1px solid #ddd;
+        }
+        .pane p {
+            margin: 0 0 1.5em 0;
+            line-height: 1.6;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            padding: 0.5rem;
+        }
+        #fun-fact-toggle {
+            padding: 0.8rem 1.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+            transition: background-color 0.3s;
+        }
+        #fun-fact-toggle:hover {
+            background-color: #0056b3;
+        }
+        #fun-fact-toggle:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .fun-fact-card {
+            background-color: #eef7ff;
+            border-left: 5px solid #007bff;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 5px;
+        }
+        .fun-fact-card h3 {
+            margin-top: 0;
+            color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Literary Companion</h1>
+
+    <div class="container">
+        <div id="original-text" class="pane">
+            <h2>Original Text</h2>
+            </div>
+
+        <div id="dynamic-content" class="pane">
+            <h2>Modern Translation</h2>
+            </div>
+    </div>
+
+    <div class="controls">
+        <button id="fun-fact-toggle">Show Fun Facts</button>
+    </div>
+
+    <script>
+        // --- API CONFIGURATION ---
+        // The client fetches novel content from our own backend API, which acts as a proxy.
+        // We call our own backend API endpoint.
+        const NOVEL_API_URL = "/api/get_novel_content";
+
+
+        // --- DOM ELEMENTS ---
+        const originalPane = document.getElementById('original-text');
+        const dynamicPane = document.getElementById('dynamic-content');
+        let dynamicPaneTitle = dynamicPane.querySelector('h2');
+        const funFactButton = document.getElementById('fun-fact-toggle');
+
+        // --- STATE MANAGEMENT ---
+        let paragraphsData = [];
+        let isShowingFunFacts = false;
+        let lastVisibleParagraphId = null;
+        let funFactsCache = {};
+        const readingSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        // --- LOGIC ---
+
+        // 1. FETCH AND RENDER NOVEL
+        async function loadNovel() {
+            funFactButton.disabled = true;
+            funFactButton.textContent = "Loading Novel...";
+            try {
+                // Fetch the novel content from the server        
+                const response = await fetch(NOVEL_API_URL);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch novel: ${response.statusText}`);
+                }
+                const data = await response.json();
+
+                // --- DEBUGGING ---
+                console.log("Data received from server:", data); 
+
+                paragraphsData = data.paragraphs;
+
+                // Clear panes and render content
+                originalPane.innerHTML = '<h2>Original Text</h2>';
+                dynamicPane.innerHTML = '<h2>Modern Translation</h2>';
+
+                paragraphsData.forEach(p => {
+                    const originalP = document.createElement('p');
+                    originalP.id = `original-${p.paragraph_id}`;
+                    originalP.textContent = p.original_text;
+                    originalPane.appendChild(originalP);
+
+                    const translatedP = document.createElement('p');
+                    translatedP.id = `translated-${p.paragraph_id}`;
+                    translatedP.textContent = p.translated_text;
+                    dynamicPane.appendChild(translatedP);
+                });
+
+                // Setup observers after content is loaded
+                setupIntersectionObserver();
+                funFactButton.disabled = false;
+                funFactButton.textContent = "Show Fun Facts";
+
+            } catch (error) {
+                console.error("Error loading novel:", error);
+                originalPane.innerHTML += `<p style="color:red;">Could not load the novel. Check browser console for errors.</p>`;
+                funFactButton.textContent = "Error Loading";
+            }
+        }
+
+        // 2. SYNCHRONIZED SCROLLING
+        function setupIntersectionObserver() {
+            const options = {
+                root: originalPane, // The scrollable container
+                rootMargin: '0px',
+                threshold: 0.5 // Trigger when 50% of the paragraph is visible
+            };
+
+            const observer = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        lastVisibleParagraphId = entry.target.id.replace('original-', '');
+                        // Auto-scroll the translation pane
+                        const correspondingTranslatedP = document.getElementById(`translated-${lastVisibleParagraphId}`);
+                        if (correspondingTranslatedP && !isShowingFunFacts) {
+                            correspondingTranslatedP.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    }
+                });
+            }, options);
+
+            // Observe all paragraph elements in the original text pane
+            const originalParagraphs = originalPane.querySelectorAll('p');
+            originalParagraphs.forEach(p => observer.observe(p));
+        }
+
+        // 3. FUN FACT GENERATION
+        funFactButton.addEventListener('click', async () => {
+            if (isShowingFunFacts) {
+                // If showing facts, toggle back to the translation view
+                renderTranslationView();
+                isShowingFunFacts = false;
+                funFactButton.textContent = "Show Fun Facts";
+                return;
+            }
+            
+            if (!lastVisibleParagraphId) {
+                alert("Please scroll down to a paragraph first.");
+                return;
+            }
+
+            // Check if we have already generated facts for this position
+            if (funFactsCache[lastVisibleParagraphId]) {
+                console.log("Found fun facts in cache. Rendering from cache.");
+                renderFunFactsView(funFactsCache[lastVisibleParagraphId]);
+                isShowingFunFacts = true;
+                funFactButton.textContent = "Show Modern English";
+                return; // Skip the API call
+            }
+
+            funFactButton.disabled = true;
+            funFactButton.textContent = "Generating...";
+
+            try {
+                // Find the index of the last read paragraph
+                const lastReadIndex = paragraphsData.findIndex(p => p.paragraph_id === lastVisibleParagraphId);
+                // Get all text from the start up to the last read paragraph
+                const textSegment = paragraphsData.slice(0, lastReadIndex + 1).map(p => p.original_text).join('\n\n');
+
+                const response = await fetch('/generate_fun_facts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text_segment: textSegment,
+                        session_id: readingSessionId
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.statusText}`);
+                }
+
+                const funFacts = await response.json();
+
+                // IMPORTANT: Store the new result in our cache before displaying
+                funFactsCache[lastVisibleParagraphId] = funFacts;
+                console.log("Fetched new facts from API and cached them.");
+        
+                renderFunFactsView(funFacts);
+                isShowingFunFacts = true;
+                funFactButton.textContent = "Show Modern English";
+
+            } catch (error) {
+                console.error("Error generating fun facts:", error);
+                alert("Could not generate fun facts. See console for details.");
+            } finally {
+                funFactButton.disabled = false;
+            }
+        });
+        
+        function renderFunFactsView(facts) {
+            dynamicPaneTitle = dynamicPane.querySelector('h2');
+            dynamicPaneTitle.textContent = "Fun Facts";
+            const contentArea = dynamicPane;
+            contentArea.innerHTML = '<h2>Fun Facts</h2>'; // Clear previous content
+
+            for (const key in facts) {
+                if (facts[key] && facts[key].fact) {
+                    const card = document.createElement('div');
+                    card.className = 'fun-fact-card';
+
+                    const title = document.createElement('h3');
+                    // Format the title nicely (e.g., historical_context -> Historical Context)
+                    title.textContent = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+                    const factText = document.createElement('p');
+                    factText.textContent = facts[key].fact.replace(title.textContent + ':', '').trim();
+
+                    card.appendChild(title);
+                    card.appendChild(factText);
+                    contentArea.appendChild(card);
+                }
+            }
+        }
+        
+        function renderTranslationView() {
+            dynamicPaneTitle.textContent = "Modern Translation";
+            const contentArea = dynamicPane;
+            contentArea.innerHTML = '<h2>Modern Translation</h2>';
+
+            paragraphsData.forEach(p => {
+                const translatedP = document.createElement('p');
+                translatedP.id = `translated-${p.paragraph_id}`;
+                translatedP.textContent = p.translated_text;
+                contentArea.appendChild(translatedP);
+            });
+        }
+
+
+        // --- INITIALIZATION ---
+        // Start the application by loading the novel when the page loads.
+        document.addEventListener('DOMContentLoaded', loadNovel);
+    </script>
+    
+</body>
+</html>

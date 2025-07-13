@@ -1,0 +1,30 @@
+# cloudbuild.yaml
+# This configuration defines a job to run the book preparation script on Cloud Build.
+
+steps:
+  # This single step installs dependencies and then runs the script in the same environment.
+  # This is the standard pattern for Cloud Build to ensure installed packages are available.
+  - name: 'python:3.12-slim'
+    entrypoint: 'bash'
+    env:
+      # PYTHONPATH=/workspace tells Python to look for modules in the /workspace directory,
+      # which is where Cloud Build copies our source code. This allows for clean imports.
+      - 'PYTHONPATH=/workspace'
+      # GOOGLE_CLOUD_PROJECT=${PROJECT_ID} explicitly passes the project ID to the
+      # script's environment. ${PROJECT_ID} is a default substitution provided
+      # by Cloud Build.
+      - 'GOOGLE_CLOUD_PROJECT=${PROJECT_ID}'
+      # GOOGLE_CLOUD_LOCATION is required by the genai library to discover the
+      # correct endpoint for Vertex AI. ${_LOCATION} is a user-defined substitution.
+      - 'GOOGLE_CLOUD_LOCATION=${_LOCATION}'
+      # GOOGLE_GENAI_USE_VERTEXAI=TRUE tells the genai library to use the
+      # Vertex AI backend instead of the Google AI (e.g. AI Studio) backend.
+      - 'GOOGLE_GENAI_USE_VERTEXAI=TRUE'
+    args:
+      - '-c'
+      - |
+        pip install --no-cache-dir -r requirements.txt && \
+        python -m scripts.run_book_preparation --bucket ${_BUCKET_NAME} --file ${_FILE_NAME}
+
+# Increase the default timeout. The maximum is 24 hours (86400s).
+timeout: 86400s # 24 hours
