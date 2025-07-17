@@ -9,8 +9,8 @@ Before you begin, ensure you have the following:
 1.  **Google Cloud Project**: A GCP project with billing enabled.
 2.  **gcloud CLI**: The [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) installed and authenticated.
     ```bash
-    gcloud auth login
-    gcloud auth application-default login
+    gcloud auth login --no-browser
+    gcloud auth application-default login --no-browser
     ```
 3.  **Enabled APIs**: The following APIs enabled in your GCP project:
     *   Cloud Run API

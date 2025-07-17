@@ -1,0 +1,58 @@
+#!/bin/bash
+# gcenv.sh.example
+
+# This file provides an example structure for your 'gcenv.sh' file.
+# Create a 'gcenv.sh' file in the same directory and replace the placeholder
+# values below with your actual configuration.
+#
+# Usage: source gcenv.sh <IDENTIFIER>
+# Example: source gcenv.sh main
+# Example: source gcenv.sh lit-comp
+
+# --- USER CONFIGURATION (BASE NAMES) ---
+# Replace with your Google Cloud Project ID
+GCP_PROJECT_ID="your-project-id"
+# Replace with your Google Cloud location/region (e.g., "us-central1")
+GCP_LOCATION="your-gcp-location"
+# Replace with your Artifact Registry repository name
+ARTIFACT_REPO_NAME="your-artifact-repo-name"
+# The base name for your Docker images
+BASE_DOCKER_IMAGE_NAME="webapp"
+# The base name for your Cloud Run services
+BASE_SERVICE_NAME="public-ui"
+# Replace with your GCS bucket for novel files
+GCS_BUCKET_NAME="your-gcs-bucket-name"
+# Replace with the default GCS file to process
+GCS_FILE_NAME="your-default-file.txt"
+# Replace with your Vertex AI model for agents and tools (e.g., "gemini-1.5-pro")
+GCP_GENERATIVE_MODEL="your-genai-model"
+
+# --- SCRIPT LOGIC ---
+# Check if an identifier was passed as an argument
+if [ -z "$1" ]; then
+    echo "ERROR: Please provide a unique identifier as an argument."
+    echo "Usage: source gcenv.sh <IDENTIFIER>"
+    return 1
+fi
+
+APP_IDENTIFIER="$1"
+
+# Export the variables with the unique identifier appended
+export PROJECT_ID="${GCP_PROJECT_ID}"
+export GOOGLE_CLOUD_PROJECT="${GCP_PROJECT_ID}" # For ADK/Vertex and other libraries
+export LOCATION="${GCP_LOCATION}"               # For gcloud commands (e.g., --region)
+export GOOGLE_CLOUD_LOCATION="${GCP_LOCATION}"  # For Python client libraries
+export REPO_NAME="${ARTIFACT_REPO_NAME}"
+export IMAGE_NAME="${BASE_DOCKER_IMAGE_NAME}-${APP_IDENTIFIER}"
+export SERVICE_NAME="${BASE_SERVICE_NAME}-${APP_IDENTIFIER}"
+export GCS_BUCKET_NAME="${GCS_BUCKET_NAME}"
+export GCS_FILE_NAME="${GCS_FILE_NAME}"
+export DEFAULT_AGENT_MODEL="${GCP_GENERATIVE_MODEL}"
+
+# --- THE FIX: Set the active gcloud project configuration ---
+gcloud config set project "${PROJECT_ID}"
+
+# --- THE FIX: Add the critical environment variable for Vertex AI mode ---
+export GOOGLE_GENAI_USE_VERTEXAI=TRUE
+
+# --- END of example file ---
