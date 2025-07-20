@@ -45,7 +45,8 @@ def run_fun_fact_generation(
     agency_task_id: str,
     book_title: str,
     chapter_number: int,
-    paragraph_in_chapter: int
+    paragraph_in_chapter: int,
+    last_paragraph_in_chapter: int,
 ) -> str:
     """
     A deterministic, Python-driven orchestrator for generating fun facts.
@@ -55,9 +56,10 @@ def run_fun_fact_generation(
     """
     print(f"--- Orchestrator: Starting fun fact generation for agency_task_id: {agency_task_id} ---")
 
-    # Create a unique ID for the text segment to use as a cache key
-    gcs_object_name = f"fun-facts/{book_title}/{chapter_number}-{paragraph_in_chapter}.json"
     bucket_name = config.GCS_BUCKET_NAME
+
+    # Create a unique ID for the text segment to use as a cache key
+    gcs_object_name = f"fun-facts/{book_title}/{chapter_number}-{last_paragraph_in_chapter}.json"
 
     # 1. Check for cached results in GCS
     if bucket_name and gcs_tool.check_gcs_object_exists(bucket_name, gcs_object_name):

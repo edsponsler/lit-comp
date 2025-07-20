@@ -47,9 +47,10 @@ async def generate_fun_facts():
     session_id = req_data.get("session_id")
     chapter_number = req_data.get("chapter_number")
     paragraph_in_chapter = req_data.get("paragraph_in_chapter")
+    last_paragraph_in_chapter = req_data.get("last_paragraph_in_chapter")
     book_title = os.environ.get("GCS_FILE_NAME", "unknown-book").replace(".txt", "")
 
-    if not all([text_segment, session_id, chapter_number, paragraph_in_chapter]):
+    if not all([text_segment, session_id, chapter_number, paragraph_in_chapter, last_paragraph_in_chapter]):
         return jsonify({"error": "Missing required fields"}), 400
 
     print("--- API: Received request for fun facts. ---")
@@ -66,6 +67,7 @@ async def generate_fun_facts():
     request_text = (
         f"Generate fun facts for {book_title}, chapter {chapter_number}, "
         f"paragraph {paragraph_in_chapter}. "
+        f"last_paragraph_in_chapter: {last_paragraph_in_chapter}. "
         f"session_id: '{session_id}', agency_task_id: '{agency_task_id}'. "
         f"The text segment is: {text_segment}"
     )

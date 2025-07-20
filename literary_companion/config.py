@@ -14,3 +14,8 @@ DEFAULT_AGENT_MODEL = os.environ.get("DEFAULT_AGENT_MODEL", "gemini-2.5-flash")
 # The GCS bucket for caching fun facts.
 # This is sourced from the GCS_BUCKET_NAME environment variable.
 GCS_BUCKET_NAME = os.environ.get("GCS_BUCKET_NAME")
+
+# The GCS file name for the prepared book.
+# This is sourced from the GCS_FILE_NAME environment variable.
+GCS_FILE_NAME = os.environ.get("GCS_FILE_NAME")
+

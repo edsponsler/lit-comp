@@ -235,6 +235,14 @@
                 const lastReadIndex = paragraphsData.findIndex(p => p.paragraph_id === lastVisibleParagraphId);
                 const textSegment = paragraphsData.slice(0, lastReadIndex + 1).map(p => p.translated_text).join('\n\n');
 
+            // Find the last paragraph number in the current chapter to help build the cache key on the backend.
+            // This avoids a large, unnecessary file read on the server for cache hits.
+            const lastParagraphInChapter = Math.max(
+                ...paragraphsData
+                    .filter(p => p.chapter_number === currentParagraph.chapter_number)
+                    .map(p => p.paragraph_in_chapter)
+            );
+
                 const response = await fetch('/generate_fun_facts', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -242,7 +250,8 @@
                         text_segment: textSegment,
                         session_id: readingSessionId,
                         chapter_number: currentParagraph.chapter_number,
-                        paragraph_in_chapter: currentParagraph.paragraph_in_chapter
+                    paragraph_in_chapter: currentParagraph.paragraph_in_chapter,
+                    last_paragraph_in_chapter: lastParagraphInChapter
                     })
                 });
 
