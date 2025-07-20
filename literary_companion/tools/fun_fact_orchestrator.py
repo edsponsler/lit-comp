@@ -5,6 +5,8 @@ import concurrent.futures
 from google.adk.tools import FunctionTool
 from literary_companion.lib import fun_fact_generators
 from literary_companion.tools import fun_fact_micro_task_board_tool as task_board
+from literary_companion.tools import gcs_tool
+from literary_companion import config
 
 def _generate_and_post_result(fact_type: str, text_segment: str, session_id: str, agency_task_id: str):
     """
@@ -38,16 +40,36 @@ def _generate_and_post_result(fact_type: str, text_segment: str, session_id: str
         return f"Failed to process {fact_type}"
 
 def run_fun_fact_generation(
-    text_segment: str, session_id: str, agency_task_id: str
+    text_segment: str, 
+    session_id: str, 
+    agency_task_id: str,
+    book_title: str,
+    chapter_number: int,
+    paragraph_in_chapter: int
 ) -> str:
     """
     A deterministic, Python-driven orchestrator for generating fun facts.
     This function manages a micro-task workflow using a Firestore-backed board
     and executes generation tasks in parallel using a ThreadPoolExecutor.
+    It also caches results in GCS.
     """
     print(f"--- Orchestrator: Starting fun fact generation for agency_task_id: {agency_task_id} ---")
 
-    # 1. Define the types of fun facts to generate
+    # Create a unique ID for the text segment to use as a cache key
+    gcs_object_name = f"fun-facts/{book_title}/{chapter_number}-{paragraph_in_chapter}.json"
+    bucket_name = config.GCS_BUCKET_NAME
+
+    # 1. Check for cached results in GCS
+    if bucket_name and gcs_tool.check_gcs_object_exists(bucket_name, gcs_object_name):
+        print(f"--- Orchestrator: Cache HIT for {gcs_object_name}. Reading from GCS. ---")
+        cached_data = gcs_tool.read_gcs_object(bucket_name, gcs_object_name)
+        if cached_data:
+            return cached_data
+        else:
+            print(f"--- Orchestrator: Cache file was empty. Proceeding to generate. ---")
+
+    print(f"--- Orchestrator: Cache MISS for {gcs_object_name}. Generating new fun facts. ---")
+    # 2. Define the types of fun facts to generate
     fun_fact_types = [
         "historical_context",
         "geographical_setting",
@@ -56,7 +78,7 @@ def run_fun_fact_generation(
         "character_relationships",
     ]
 
-    # 2. Post a 'new_task' for each fun fact type to the micro-task board
+    # 3. Post a 'new_task' for each fun fact type to the micro-task board
     for fact_type in fun_fact_types:
         task_board.post_micro_entry(
             agency_task_id=agency_task_id,
@@ -67,7 +89,7 @@ def run_fun_fact_generation(
         )
     print(f"--- Orchestrator: Posted {len(fun_fact_types)} new tasks to the board. ---")
 
-    # 3. Process each task type in PARALLEL using a ThreadPoolExecutor
+    # 4. Process each task type in PARALLEL using a ThreadPoolExecutor
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(fun_fact_types)) as executor:
         # Prepare future tasks for each fact type
         future_to_fact_type = {
@@ -83,7 +105,7 @@ def run_fun_fact_generation(
             except Exception as exc:
                 print(f"--- Orchestrator (Thread): Task for '{fact_type}' generated an exception: {exc} ---")
 
-    # 4. Aggregate the results from the board
+    # 5. Aggregate the results from the board
     print("--- Orchestrator: Aggregating final results... ---")
     final_results = {}
     for fact_type in fun_fact_types:
@@ -95,10 +117,20 @@ def run_fun_fact_generation(
             entry_payload = response["entries"][0].get("output_payload")
             if "error" not in entry_payload:
                  final_results[fact_type] = entry_payload
+    
+    # 6. Store the results in GCS for future use
+    if bucket_name:
+        print(f"--- Orchestrator: Storing results in GCS at {gcs_object_name}. ---")
+        json_results = json.dumps(final_results)
+        gcs_tool.write_gcs_object(
+            bucket_name=bucket_name,
+            object_name=gcs_object_name,
+            content=json_results
+        )
 
     print("--- Orchestrator: Fun fact generation complete. ---")
 
-    # 5. Return the aggregated results as a single JSON string
+    # 7. Return the aggregated results as a single JSON string
     return json.dumps(final_results)
 
 

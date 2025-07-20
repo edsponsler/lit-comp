@@ -6,7 +6,7 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part 
-from literary_companion.tools.gcs_tool import read_text_from_gcs
+from literary_companion.tools.gcs_tool import read_gcs_object
 from literary_companion.agents.fun_fact_coordinator_v1 import fun_fact_coordinator
 from dotenv import load_dotenv
 
@@ -45,9 +45,12 @@ async def generate_fun_facts():
     req_data = request.get_json()
     text_segment = req_data.get("text_segment")
     session_id = req_data.get("session_id")
+    chapter_number = req_data.get("chapter_number")
+    paragraph_in_chapter = req_data.get("paragraph_in_chapter")
+    book_title = os.environ.get("GCS_FILE_NAME", "unknown-book").replace(".txt", "")
 
-    if not all([text_segment, session_id]):
-        return jsonify({"error": "Missing required fields: text_segment, session_id"}), 400
+    if not all([text_segment, session_id, chapter_number, paragraph_in_chapter]):
+        return jsonify({"error": "Missing required fields"}), 400
 
     print("--- API: Received request for fun facts. ---")
     runner_lc = Runner(
@@ -61,8 +64,10 @@ async def generate_fun_facts():
         app_name="literary-companion-fun-facts", user_id=user_id, session_id=agency_task_id
     )
     request_text = (
-        f"Generate fun facts for session_id '{session_id}' and "
-        f"agency_task_id '{agency_task_id}'. The text segment is: {text_segment}"
+        f"Generate fun facts for {book_title}, chapter {chapter_number}, "
+        f"paragraph {paragraph_in_chapter}. "
+        f"session_id: '{session_id}', agency_task_id: '{agency_task_id}'. "
+        f"The text segment is: {text_segment}"
     )
     initial_message = Content(role="user", parts=[Part(text=request_text)])
 
@@ -124,7 +129,7 @@ def get_novel_content():
     
     try:
         # Use the robust tool function we already wrote
-        content = read_text_from_gcs(bucket_name, prepared_file_name)
+        content = read_gcs_object(bucket_name, prepared_file_name)
         # The content is a JSON string, so we can parse it.
         data = json.loads(content)
         return jsonify(data)

@@ -10,3 +10,7 @@ load_dotenv()
 # This is sourced from the DEFAULT_AGENT_MODEL environment variable.
 # A fallback is provided for local development if the variable is not set.
 DEFAULT_AGENT_MODEL = os.environ.get("DEFAULT_AGENT_MODEL", "gemini-2.5-flash")
+
+# The GCS bucket for caching fun facts.
+# This is sourced from the GCS_BUCKET_NAME environment variable.
+GCS_BUCKET_NAME = os.environ.get("GCS_BUCKET_NAME")
