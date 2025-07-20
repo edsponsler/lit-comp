@@ -98,8 +98,7 @@
     </div>
 
     <div class="controls">
-        <!-- <button id="fun-fact-toggle">Show Fun Facts</button> -->
-        <button id="fun-fact-toggle" disabled>Temporarily disabled.</button>        
+        <button id="fun-fact-toggle">Show Fun Facts</button>
     </div>
 
     <script>
@@ -159,7 +158,7 @@
 
                 // Setup observers after content is loaded
                 setupIntersectionObserver();
-                funFactButton.disabled = true;
+                funFactButton.disabled = false;
                 funFactButton.textContent = "Show Fun Facts";
 
             } catch (error) {

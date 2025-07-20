@@ -80,8 +80,14 @@ async def generate_fun_facts():
                 
                 # The event log shows the data is in the 'result' key of the response dictionary
                 response_dict = event.content.parts[0].function_response.response
-                final_facts_json_string = response_dict.get('result')
-                break # We found what we need, we can exit the loop
+                # Type-check to ensure the response is a dictionary, which satisfies linters
+                # and adds robustness, even though the ADK framework should always provide a dict.
+                if isinstance(response_dict, dict):
+                    final_facts_json_string = response_dict.get('result')
+                else:
+                    # This case is not expected, so we'll ensure the string is None.
+                    final_facts_json_string = None
+                break  # We found what we need, we can exit the loop
 
         if final_facts_json_string:
             final_facts = json.loads(final_facts_json_string)
@@ -104,26 +110,31 @@ def get_novel_content():
     bucket_name = os.environ.get("GCS_BUCKET_NAME")
     source_file_name = os.environ.get("GCS_FILE_NAME")
 
-    if not all([bucket_name, source_file_name]):
-        return jsonify({"error": "Server is not configured with GCS_BUCKET_NAME and GCS_FILE_NAME."}), 500
+    # This explicit check serves as a type guard that static analyzers understand,
+    # proving that neither variable is None before they are used further down.
+    if not bucket_name or not source_file_name:
+        error_msg = "Server is not configured with GCS_BUCKET_NAME and GCS_FILE_NAME."
+        app.logger.error(f"API Error in get_novel_content: {error_msg}")
+        return jsonify({"error": error_msg}), 500
 
     # Construct the name of the prepared file based on the source file name
     prepared_file_name = source_file_name.replace('.txt', '_prepared.json')
 
     print(f"--- API Proxy: Fetching gs://{bucket_name}/{prepared_file_name} ---")
     
-    # Use the robust tool function we already wrote
-    content = read_text_from_gcs(bucket_name, prepared_file_name)
-
-    if content.startswith("Error:"):
-        return jsonify({"error": content}), 500
-
-    # The content is already a JSON string, so we can return it directly
-    # after parsing and re-dumping to ensure it's valid JSON.
     try:
+        # Use the robust tool function we already wrote
+        content = read_text_from_gcs(bucket_name, prepared_file_name)
+        # The content is a JSON string, so we can parse it.
         data = json.loads(content)
         return jsonify(data)
+    except (IOError, ConnectionError) as e:
+        # Catches errors from the GCS tool, like file not found or client issues.
+        app.logger.error(f"GCS access error in get_novel_content: {e}")
+        return jsonify({"error": str(e)}), 500
     except json.JSONDecodeError:
+        # Catches errors if the file content is not valid JSON.
+        app.logger.error(f"JSON parsing error for gs://{bucket_name}/{prepared_file_name}")
         return jsonify({"error": "Failed to parse novel content as JSON."}), 500
 
 if __name__ == '__main__':

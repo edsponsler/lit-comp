@@ -6,6 +6,7 @@ from google.cloud import storage
 import tempfile
 import time
 from datetime import datetime
+from typing import List, Optional
 from google.adk.tools import FunctionTool
 import concurrent.futures
 from literary_companion.tools.translation_tool import translate_text
@@ -24,16 +25,19 @@ except Exception as e:
 def read_text_from_gcs(bucket_name: str, file_name: str) -> str:
     """Reads a text file from a GCS bucket."""
     if not storage_client:
-        return "Error: GCS client not initialized."
+        # Raise an exception for unrecoverable errors.
+        raise ConnectionError("GCS client not initialized.")
     try:
         bucket = storage_client.bucket(bucket_name)
         blob = bucket.blob(file_name)
         content = blob.download_as_text()
         logging.info(f"Successfully read {len(content)} chars from gs://{bucket_name}/{file_name}")
         return content
-    except Exception as e:
+    except Exception as e: # Catches GCS-specific errors like google.api_core.exceptions.NotFound
         logging.error(f"Error reading from GCS: {e}", exc_info=True)
-        return f"Error: Could not read file from GCS. {e}"
+        # Re-raise the exception to be handled by the caller.
+        # This is more idiomatic than returning an error string.
+        raise IOError(f"Could not read gs://{bucket_name}/{file_name}") from e
 
 def write_text_to_gcs(bucket_name: str, file_name: str, content: str) -> str:
     """Writes text content to a file in a GCS bucket."""
@@ -49,7 +53,7 @@ def write_text_to_gcs(bucket_name: str, file_name: str, content: str) -> str:
         logging.error(f"Error writing to GCS: {e}", exc_info=True)
         return f"Error: Could not write file to GCS. {e}"
 
-def _translate_paragraph_worker(paragraph_id: int, paragraph_text: str) -> dict:
+def _translate_paragraph_worker(paragraph_id: int, paragraph_text: str) -> Optional[dict]:
     """
     Worker function to translate a single paragraph.
     Designed to be called from a ThreadPoolExecutor.
@@ -98,7 +102,8 @@ def process_and_translate_book(bucket_name: str, file_name: str) -> str:
     logging.info(f"Segmented text into {total_paragraphs} paragraphs. Starting parallel translation...")
 
     # Use a list of the correct size to store results in order, preventing race conditions.
-    prepared_paragraphs = [None] * total_paragraphs
+    # By explicitly typing the list, we inform the linter what types are expected.
+    prepared_paragraphs: List[Optional[dict]] = [None] * total_paragraphs
 
     # Use a ThreadPoolExecutor to run translations in parallel.
     # max_workers can be tuned, but 16 is a reasonable starting point for I/O-bound tasks.
