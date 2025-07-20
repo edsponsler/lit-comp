@@ -1,73 +1,127 @@
-# Literary Companion AI
+# Literary Companion
 
-Welcome to the Literary Companion AI project! This is the initial phase of an ambitious three-phase project to build a sophisticated, RAG-based conversational AI agent designed to interact with and provide insights on a large corpus of domain-specific source material.
+Literary Companion is a web application designed to enrich the classic reading experience. As you read a novel, it provides a modern English translation and generates contextually relevant "fun facts" and trivia in a side panel, bringing the story's world to life.
 
-## Project Overview
+Built with Python, Flask, and the Google Agent Development Kit (ADK), this project leverages the power of generative AI (Vertex AI) to create a dynamic and interactive companion for your literary journeys.
 
-The ultimate vision of this project is to create an AI-powered literary companion that can engage in deep, meaningful conversations about a vast collection of literary works. This will be achieved in three distinct phases:
+## Features
 
-*   **Phase 1: Data Ingestion and Indexing (Current Phase)**: The foundational phase of the project. Here, we focus on ingesting, processing, and indexing a large corpus of literary texts. The primary goal is to transform raw source material into a structured, enriched format that can be efficiently queried and utilized by a retrieval-augmented generation (RAG) model.
-*   **Phase 2: RAG Implementation and Conversational AI Development**: In the second phase, we will build the core conversational AI agent. This will involve leveraging the indexed data from Phase 1 to develop a RAG-based system that can accurately retrieve relevant information and generate insightful, context-aware responses.
-*   **Phase 3: Advanced Features and User Interface**: The final phase will focus on enhancing the user experience. This will include developing a user-friendly interface, integrating advanced features such as character analysis and thematic exploration, and refining the AI's conversational abilities.
+*   **Side-by-Side Reading:** View the original text alongside a modern, easy-to-understand English translation.
+*   **On-Demand Fun Facts:** As you read, request "Fun Facts" related to the current passage. The application generates insights on:
+    *   Historical Context
+    *   Geographical Settings
+    *   Plot Points
+    *   Character Sentiments & Relationships
+*   **Screenplay Generation Tools:** Includes tools to generate a high-level beat sheet or a detailed scene list from the novel text.
+*   **Cloud-Native:** Utilizes Google Cloud Storage for book content and Vertex AI for generative tasks.
 
-## Architecture and Workflow
+## Architecture Overview
 
-The current architecture is designed to support the data ingestion and indexing pipeline of Phase 1. The key components and workflow are as follows:
+The application operates using two primary workflows, both orchestrated by AI agents built with the Google ADK.
 
-1.  **Source Material**: The process begins with a large corpus of literary texts, such as the included "Moby Dick" by Herman Melville.
-2.  **Data Ingestion**: The `scripts/migrate_prepared_json.py` script is used to process the raw text. It cleans the text, splits it into paragraphs, and enriches it with metadata such as chapter and paragraph numbers.
-3.  **Structured Data**: The output of the ingestion process is a structured JSON file (e.g., `pg2701-moby-dick-all_prepared_v2.json`), where each entry represents a paragraph with its associated metadata.
-4.  **Cloud Storage**: The processed JSON files are stored in a Google Cloud Storage (GCS) bucket, making them easily accessible for future use in the RAG pipeline.
+![Architecture Diagram](https://storage.googleapis.com/gcp-community/images/adk/lit-comp-arch.png)
 
-## Local Setup and Development
+### 1. Book Preparation (A One-Time Process)
 
-To get started with the project locally, follow these steps:
+Before a novel can be read in the UI, it must be prepared. This is a batch process that you run once for each book.
 
-1.  **Clone the Repository**:
+*   **How it works:** A script invokes the `BookPreparationCoordinator` agent. This agent uses a tool to read the novel's raw text from Google Cloud Storage (GCS), splits it into paragraphs, and uses a generative model to translate each paragraph into modern English. The final structured data (original text, translated text, paragraph IDs) is saved as a single JSON file back into GCS.
+
+### 2. Fun Fact Generation (The Interactive Experience)
+
+This is the core interactive loop that happens as a user reads the book.
+
+*   **How it works:** The web interface tracks the user's reading progress. When the "Show Fun Facts" button is clicked, the text read so far is sent to the backend Flask API. The API invokes the `FunFactCoordinator` agent, which in turn uses an orchestrator tool to generate different types of fun facts in parallel. These facts are generated by a set of specialized functions that call Vertex AI. The results are collected and sent back to the user's browser.
+
+### Key Technologies
+
+*   **Backend:** Python with Flask
+*   **AI Agent Framework:** Google Agent Development Kit (ADK)
+*   **Generative AI:** Google Cloud Vertex AI
+*   **Storage:** Google Cloud Storage (GCS)
+*   **Task Coordination:** Google Cloud Firestore (used as a temporary "task board" for fun fact generation)
+*   **Frontend:** Vanilla HTML, CSS, and JavaScript
+
+## Getting Started
+
+Follow these steps to get the Literary Companion running on your local machine.
+
+### Prerequisites
+
+*   Python 3.9+
+*   A Google Cloud Project with billing enabled.
+*   The `gcloud` CLI installed and authenticated.
+*   APIs Enabled: Vertex AI, Cloud Storage, Firestore.
+
+### Installation
+
+1.  **Clone the repository:**
     ```bash
-    git clone <repository-url>
+    git clone <your-repo-url>
     cd lit-comp
     ```
 
-2.  **Create a Virtual Environment**:
+2.  **Set up a virtual environment:**
     ```bash
-    python3 -m venv .venv
+    python -m venv .venv
     source .venv/bin/activate
     ```
 
-3.  **Install Dependencies**:
+3.  **Install dependencies:**
     ```bash
     pip install -r requirements.txt
     ```
 
-4.  **Configure Environment Variables**:
-    Create a `gcenv.sh` file by copying the example:
-    ```bash
-    cp gcenv.sh.example gcenv.sh
+4.  **Configure Environment Variables:**
+    Create a `.env` file in the project root and add the necessary configuration. This file is loaded by the Flask application for local development.
+
+    ```env
+    # .env
+
+    # --- GCP Configuration ---
+    GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
+    GOOGLE_CLOUD_LOCATION="your-gcp-region" # e.g., us-central1
+
+    # --- Application Specific ---
+    GCS_BUCKET_NAME="your-gcs-bucket-name"
+    GCS_FILE_NAME="name-of-your-book.txt" # The book to load by default
+
+    # --- AI Model Configuration ---
+    DEFAULT_AGENT_MODEL="gemini-1.5-flash-001"
+    GOOGLE_GENAI_USE_VERTEXAI=TRUE
     ```
-    Edit `gcenv.sh` and replace the placeholder values with your Google Cloud project details. Then, source the file:
+
+### Usage
+
+1.  **Upload a Book:** Upload a plain text (`.txt`) version of a novel to your GCS bucket.
+
+2.  **Prepare the Book:** Run the book preparation script, pointing it to the file you just uploaded.
     ```bash
-    source gcenv.sh your-identifier
+    python scripts/run_book_preparation.py --bucket "your-gcs-bucket-name" --file "name-of-your-book.txt"
+    ```
+    This will create a `_prepared.json` file in your bucket.
+
+3.  **Run the Web Application:**
+    Start the Flask development server.
+    ```bash
+    python app.py
     ```
 
-5.  **Run the Ingestion Script**:
-    You can now run the data ingestion script to process a book:
-    ```bash
-    python3 scripts/migrate_prepared_json.py scripts/assets/pg2701-moby-dick-all.txt scripts/assets/pg2701-moby-dick-all_prepared.json
-    ```
+4.  **Open in Browser:** Navigate to `http://127.0.0.1:5001` to start reading.
 
-## Contributing and Future Development
+## How to Contribute
 
-We welcome contributions to the Literary Companion AI project! Here are some areas where you can get involved:
+We welcome contributions! Here are a few ideas to get you started:
 
-*   **Testing**: The project currently lacks a dedicated testing suite. Introducing unit tests for the data ingestion scripts and other components would greatly improve code quality and reliability.
-*   **Documentation**: Enhancing the documentation, both in the code and in the README, would make it easier for new contributors to get involved.
-*   **New Feature Ideas**:
-    *   **Character and Location Extraction**: Extend the data ingestion pipeline to identify and extract named entities such as characters and locations.
-    *   **Thematic Analysis**: Develop tools to perform thematic analysis on the indexed texts.
-    *   **Support for More Formats**: Add support for ingesting books in different formats, such as ePub or PDF.
-*   **Refinement**:
-    *   **Error Handling**: Improve the error handling in the data ingestion scripts to make them more robust.
-    *   **Performance Optimization**: Optimize the performance of the data processing pipeline to handle larger corpora more efficiently.
+1.  **Immersive Audio Experience:**
+    Add a "Listen" button that generates and plays short, relevant audio clips for the current scene. This could involve creating a new tool that uses a text-to-audio generation model to create background soundscapes (e.g., a bustling 19th-century London street, the creaking of a ship at sea) or sound effects for key actions.
 
-We are excited to have you on board and look forward to your contributions!
+2.  **Multi-Format Book Support:**
+    Currently, the application only processes `.txt` files. A great enhancement would be to extend the `book_processor_tool` to handle popular ebook formats like `.epub` and `.pdf`. This would require adding libraries like `ebooklib` and `PyPDF2` to parse these files and extract their text content before passing it to the translation and analysis pipeline.
+
+3.  **Persistent User Sessions with Redis:**
+    The current `InMemorySessionService` loses user history when the app restarts, which is not ideal for a production environment. A valuable contribution would be to replace it with a persistent session store using Redis. This would involve creating a `RedisSessionService` class that implements the `BaseSessionService` interface, connecting to a Redis instance, and handling the serialization/deserialization of session data.
+
+## License
+
+This project is licensed under the Apache 2.0 License.
