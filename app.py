@@ -5,9 +5,9 @@ import vertexai
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from google.genai.types import Content, Part 
+from google.genai.types import Content, Part
 from literary_companion.tools.gcs_tool import read_gcs_object
-from literary_companion.agents.fun_fact_coordinator_v1 import fun_fact_coordinator
+from literary_companion.agents.fun_fact_adk_agents import FunFactCoordinatorAgent
 from dotenv import load_dotenv
 
 load_dotenv() 
@@ -40,7 +40,7 @@ def literary_companion_page():
 @app.route("/generate_fun_facts", methods=["POST"])
 async def generate_fun_facts():
     """
-    Receives user progress and runs the FunFactCoordinator_v1 agent.
+    Receives user progress and runs the FunFactCoordinatorAgent.
     """
     req_data = request.get_json()
     text_segment = req_data.get("text_segment")
@@ -54,55 +54,54 @@ async def generate_fun_facts():
         return jsonify({"error": "Missing required fields"}), 400
 
     print("--- API: Received request for fun facts. ---")
-    runner_lc = Runner(
-        agent=fun_fact_coordinator,
-        app_name="literary-companion-fun-facts",
+
+    # 1. Define the fun fact types to generate
+    fun_fact_types = [
+        "historical_context",
+        "geographical_setting",
+        "plot_points",
+        "character_sentiments",
+        "character_relationships",
+    ]
+
+    # 2. Create the coordinator agent instance for this request
+    coordinator = FunFactCoordinatorAgent(fun_fact_types=fun_fact_types)
+
+    # 3. Initialize the runner with the new agent
+    runner = Runner(
+        agent=coordinator,
+        app_name="literary-companion-adk",
         session_service=session_service_lc,
     )
+
     user_id = f"user_{session_id}"
-    agency_task_id = f"task_{uuid.uuid4()}"
+    # Use the session_id from the client as the ADK session_id
+    adk_session_id = session_id
+
+    # 4. Create a session with the initial state containing the text segment
+    initial_state = {"text_segment": text_segment}
     session_service_lc.create_session(
-        app_name="literary-companion-fun-facts", user_id=user_id, session_id=agency_task_id
+        app_name="literary-companion-adk", user_id=user_id, session_id=adk_session_id, state=initial_state
     )
-    request_text = (
-        f"Generate fun facts for {book_title}, chapter {chapter_number}, "
-        f"paragraph {paragraph_in_chapter}. "
-        f"last_paragraph_in_chapter: {last_paragraph_in_chapter}. "
-        f"session_id: '{session_id}', agency_task_id: '{agency_task_id}'. "
-        f"The text segment is: {text_segment}"
-    )
-    initial_message = Content(role="user", parts=[Part(text=request_text)])
+
+    # 5. Run the agent
+    initial_message = Content(role="user", parts=[Part(text="Generate fun facts.")])
 
     try:
-        final_facts_json_string = None
-        # We will loop through the events to find the one that contains our tool's direct response
-        async for event in runner_lc.run_async(
-            user_id=user_id, session_id=agency_task_id, new_message=initial_message
+        # Run the agent to completion by iterating through the events.
+        async for event in runner.run_async(
+            user_id=user_id, session_id=adk_session_id, new_message=initial_message
         ):
-            # Check if the event part contains a function_response with the correct name
-            if (event.content and 
-                event.content.parts and
-                event.content.parts[0].function_response and
-                event.content.parts[0].function_response.name == "run_fun_fact_generation"):
-                
-                # The event log shows the data is in the 'result' key of the response dictionary
-                response_dict = event.content.parts[0].function_response.response
-                # Type-check to ensure the response is a dictionary, which satisfies linters
-                # and adds robustness, even though the ADK framework should always provide a dict.
-                if isinstance(response_dict, dict):
-                    final_facts_json_string = response_dict.get('result')
-                else:
-                    # This case is not expected, so we'll ensure the string is None.
-                    final_facts_json_string = None
-                break  # We found what we need, we can exit the loop
+            pass  # We just need the agent to run; the result is in the state.
 
-        if final_facts_json_string:
-            final_facts = json.loads(final_facts_json_string)
-            print("--- API: Successfully generated and parsed fun facts. ---")
-            return jsonify(final_facts)
-        else:
-            print("--- API Error: Did not receive a valid response from the orchestrator tool. ---")
-            return jsonify({"error": "Failed to get a response from the fun fact orchestrator tool."}), 500
+        # 6. Retrieve the final result from the session state
+        final_session = session_service_lc.get_session(
+            app_name="literary-companion-adk", user_id=user_id, session_id=adk_session_id
+        )
+        final_result = final_session.state.get("final_fun_facts", {})
+
+        print("--- API: Successfully generated fun facts with ADK agent. ---")
+        return jsonify(final_result)
 
     except Exception as e:
         print(f"--- API Error: {e} ---")

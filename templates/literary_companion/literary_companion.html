@@ -280,14 +280,17 @@
             const contentArea = dynamicPane;
             contentArea.innerHTML = '<h2>Fun Facts</h2>';
 
+            // The new ADK agent returns a simple {key: "fact text"} dictionary.
+            // The old implementation returned {key: {fact: "fact text"}}.
+            // This logic is updated to handle the new, simpler structure.
             for (const key in facts) {
-                if (facts[key] && facts[key].fact) {
+                if (facts[key] && typeof facts[key] === 'string') {
                     const card = document.createElement('div');
                     card.className = 'fun-fact-card';
                     const title = document.createElement('h3');
                     title.textContent = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                     const factText = document.createElement('p');
-                    factText.textContent = facts[key].fact.replace(title.textContent + ':', '').trim();
+                    factText.textContent = facts[key];
                     card.appendChild(title);
                     card.appendChild(factText);
                     contentArea.appendChild(card);

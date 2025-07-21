@@ -6,4 +6,4 @@ python-dotenv
 deprecated # Required by google-adk for managing versioning warnings
 Flask[async]  # For running Flask asynchronously
 gunicorn # For running Flask in Cloud Run
-uvicorn # For running gunicorn with async workers
+uvicorn # For running gunicorn with async workersgoogle-adk
