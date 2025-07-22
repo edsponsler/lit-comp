@@ -116,7 +116,9 @@
 
     <script>
         // --- API CONFIGURATION ---
-        const NOVEL_API_URL = "/api/get_novel_content";
+        const METADATA_API_URL = "/api/get_book_metadata";
+        const CHAPTER_API_URL = "/api/get_book_chapter";
+        const FUN_FACTS_API_URL = "/generate_fun_facts";
 
         // --- DOM ELEMENTS ---
         const originalPane = document.getElementById('original-text');
@@ -126,163 +128,210 @@
         const progressIndicator = document.getElementById('progress-indicator');
 
         // --- STATE MANAGEMENT ---
+        let paragraphsMetadata = [];
         let paragraphsData = [];
         let isShowingFunFacts = false;
         let lastVisibleParagraphId = null;
         let funFactsCache = {};
-        const readingSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        let currentChapterNumber = 0;
+        let nextChapterToLoad = 1;
+        let isLoading = false;
+        let allChaptersLoaded = false;
+        const bookName = "{{ GCS_FILE_NAME or 'frankenstein.txt' }}";
+        const readingSessionId = `session_${Date.now()}`;
+        let observer;
+        let isSyncingScroll = false;
 
         // --- LOGIC ---
 
-        // 1. FETCH AND RENDER NOVEL
-        async function loadNovel() {
+        // 1. INITIALIZE PAGE
+        async function initializePage() {
             funFactButton.disabled = true;
             funFactButton.textContent = "Loading Novel...";
             try {
-                const response = await fetch(NOVEL_API_URL);
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch novel: ${response.statusText}`);
-                }
-                const data = await response.json();
-                paragraphsData = data.paragraphs;
-
-                originalPane.innerHTML = '<h2>Original Text</h2>';
-                dynamicPane.innerHTML = '<h2>Modern Translation</h2>';
-
-                paragraphsData.forEach(p => {
-                    const originalP = document.createElement('p');
-                    originalP.id = `original-${p.paragraph_id}`;
-                    originalP.textContent = p.original_text;
-                    originalPane.appendChild(originalP);
-
-                    const translatedP = document.createElement('p');
-                    translatedP.id = `translated-${p.paragraph_id}`;
-                    translatedP.textContent = p.translated_text;
-                    dynamicPane.appendChild(translatedP);
-                });
-
                 setupIntersectionObserver();
+                await loadMetadata();
+                await loadNextChapter();
+                enableScrollSync();
                 funFactButton.disabled = false;
                 funFactButton.textContent = "Show Fun Facts";
-
             } catch (error) {
-                console.error("Error loading novel:", error);
-                originalPane.innerHTML += `<p style="color:red;">Could not load the novel. Check browser console for errors.</p>`;
+                console.error("Initialization Error:", error);
+                originalPane.innerHTML = `<p style="color:red;">Could not load the novel.</p>`;
                 funFactButton.textContent = "Error Loading";
             }
         }
 
-        // 2. SYNCHRONIZED SCROLLING & PROGRESS TRACKING
-        function setupIntersectionObserver() {
-            const options = {
-                root: originalPane,
-                rootMargin: '0px',
-                threshold: 0.5
-            };
+        // 2. LOAD METADATA
+        async function loadMetadata() {
+            const response = await fetch(METADATA_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ book_name: bookName })
+            });
+            const data = await response.json();
+            paragraphsMetadata = data.paragraphs;
+        }
 
-            const observer = new IntersectionObserver((entries, observer) => {
+        // 3. LOAD CHAPTER CONTENT
+        async function loadNextChapter() {
+            if (isLoading || allChaptersLoaded) return;
+            isLoading = true;
+
+            const chapterToLoad = nextChapterToLoad;
+            const maxChapter = Math.max(...paragraphsMetadata.map(p => p.chapter_number));
+            if (chapterToLoad > maxChapter) {
+                allChaptersLoaded = true;
+                isLoading = false;
+                observer.disconnect();
+                return;
+            }
+
+            const response = await fetch(CHAPTER_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ book_name: bookName, chapter_number: chapterToLoad })
+            });
+            const data = await response.json();
+            const newParagraphs = data.paragraphs || [];
+
+            if (newParagraphs.length > 0) {
+                renderNewParagraphs(newParagraphs);
+                paragraphsData.push(...newParagraphs);
+                nextChapterToLoad++;
+            }
+
+            isLoading = false;
+        }
+
+        function renderNewParagraphs(paragraphs) {
+            const sentinel = document.getElementById('scroll-sentinel');
+            if (sentinel) observer.unobserve(sentinel);
+
+            paragraphs.forEach(p => {
+                const p_orig = document.createElement('p');
+                p_orig.id = `p-orig-${p.paragraph_id}`;
+                p_orig.dataset.chapter = p.chapter_number;
+                p_orig.dataset.para = p.paragraph_in_chapter;
+                p_orig.textContent = p.original_text;
+                originalPane.appendChild(p_orig);
+                observer.observe(p_orig);
+
+                const p_trans = document.createElement('p');
+                p_trans.id = `p-trans-${p.paragraph_id}`;
+                p_trans.textContent = p.translated_text;
+                dynamicPane.appendChild(p_trans);
+            });
+
+            if (!allChaptersLoaded) {
+                const newSentinel = document.createElement('div');
+                newSentinel.id = 'scroll-sentinel';
+                originalPane.appendChild(newSentinel);
+                observer.observe(newSentinel);
+            }
+        }
+
+        // 4. OBSERVER & SCROLLING
+        function setupIntersectionObserver() {
+            const options = { root: originalPane, threshold: 0.1 };
+            observer = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        lastVisibleParagraphId = entry.target.id.replace('original-', '');
-                        updateProgressIndicator(lastVisibleParagraphId);
-                        const correspondingTranslatedP = document.getElementById(`translated-${lastVisibleParagraphId}`);
-                        if (correspondingTranslatedP && !isShowingFunFacts) {
-                            correspondingTranslatedP.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
+                    if (!entry.isIntersecting) return;
+
+                    if (entry.target.id === 'scroll-sentinel') {
+                        loadNextChapter();
+                    } else {
+                        lastVisibleParagraphId = entry.target.id.replace('p-orig-', '');
+                        updateProgressIndicator(entry.target.dataset.chapter, entry.target.dataset.para);
                     }
                 });
             }, options);
-
-            const originalParagraphs = originalPane.querySelectorAll('p');
-            originalParagraphs.forEach(p => observer.observe(p));
         }
 
-        function updateProgressIndicator(paragraphId) {
-            const paragraph = paragraphsData.find(p => p.paragraph_id === paragraphId);
-            if (paragraph) {
-                progressIndicator.textContent = `Chapter: ${paragraph.chapter_number}, Paragraph: ${paragraph.paragraph_in_chapter}`;
+        const syncOriginalToDynamic = () => syncPanes(originalPane, dynamicPane);
+        const syncDynamicToOriginal = () => syncPanes(dynamicPane, originalPane);
+
+        function enableScrollSync() {
+            originalPane.addEventListener('scroll', syncOriginalToDynamic);
+            dynamicPane.addEventListener('scroll', syncDynamicToOriginal);
+        }
+
+        function disableScrollSync() {
+            originalPane.removeEventListener('scroll', syncOriginalToDynamic);
+            dynamicPane.removeEventListener('scroll', syncDynamicToOriginal);
+        }
+
+        function syncPanes(source, target) {
+            if (isSyncingScroll) return;
+            isSyncingScroll = true;
+            target.scrollTop = source.scrollTop;
+            setTimeout(() => { isSyncingScroll = false; }, 50);
+        }
+
+        function updateProgressIndicator(chapter, para) {
+            if (chapter && para) {
+                progressIndicator.textContent = `Chapter: ${chapter}, Paragraph: ${para}`;
             }
         }
 
-        // 3. FUN FACT GENERATION
+        // 5. FUN FACT GENERATION
         funFactButton.addEventListener('click', async () => {
+            const scrollPos = originalPane.scrollTop;
+            disableScrollSync();
+
             if (isShowingFunFacts) {
-                renderTranslationView();
+                await renderTranslationView();
                 isShowingFunFacts = false;
                 funFactButton.textContent = "Show Fun Facts";
-                return;
-            }
-            
-            if (!lastVisibleParagraphId) {
-                alert("Please scroll down to a paragraph first.");
-                return;
-            }
+            } else {
+                const currentParagraph = paragraphsData.find(p => p.paragraph_id == lastVisibleParagraphId);
+                const chapterNumber = currentParagraph ? currentParagraph.chapter_number : nextChapterToLoad - 1;
+                const cacheKey = `funfacts-ch-${chapterNumber}`;
 
-            const currentParagraph = paragraphsData.find(p => p.paragraph_id === lastVisibleParagraphId);
-            const cacheKey = `${currentParagraph.chapter_number}-${currentParagraph.paragraph_in_chapter}`;
-
-            if (funFactsCache[cacheKey]) {
-                renderFunFactsView(funFactsCache[cacheKey]);
-                isShowingFunFacts = true;
-                funFactButton.textContent = "Show Modern English";
-                return;
-            }
-
-            funFactButton.disabled = true;
-            funFactButton.textContent = "Generating...";
-
-            try {
-                const lastReadIndex = paragraphsData.findIndex(p => p.paragraph_id === lastVisibleParagraphId);
-                const textSegment = paragraphsData.slice(0, lastReadIndex + 1).map(p => p.translated_text).join('\n\n');
-
-            // Find the last paragraph number in the current chapter to help build the cache key on the backend.
-            // This avoids a large, unnecessary file read on the server for cache hits.
-            const lastParagraphInChapter = Math.max(
-                ...paragraphsData
-                    .filter(p => p.chapter_number === currentParagraph.chapter_number)
-                    .map(p => p.paragraph_in_chapter)
-            );
-
-                const response = await fetch('/generate_fun_facts', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        text_segment: textSegment,
-                        session_id: readingSessionId,
-                        chapter_number: currentParagraph.chapter_number,
-                    paragraph_in_chapter: currentParagraph.paragraph_in_chapter,
-                    last_paragraph_in_chapter: lastParagraphInChapter
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error(`API Error: ${response.statusText}`);
+                if (funFactsCache[cacheKey]) {
+                    await renderFunFactsView(funFactsCache[cacheKey]);
+                } else {
+                    funFactButton.disabled = true;
+                    funFactButton.textContent = "Generating...";
+                    try {
+                        const chapterText = paragraphsData.filter(p => p.chapter_number === chapterNumber)
+                                                          .map(p => p.original_text)
+                                                          .join('\n\n');
+                        const response = await fetch(FUN_FACTS_API_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                text_segment: chapterText,
+                                session_id: readingSessionId,
+                                chapter_number: chapterNumber,
+                                book_name: bookName
+                            })
+                        });
+                        if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
+                        const funFacts = await response.json();
+                        funFactsCache[cacheKey] = funFacts;
+                        await renderFunFactsView(funFacts);
+                    } catch (error) {
+                        console.error("Error generating fun facts:", error);
+                        alert("Could not generate fun facts. See console for details.");
+                    } finally {
+                        funFactButton.disabled = false;
+                    }
                 }
-
-                const funFacts = await response.json();
-                funFactsCache[cacheKey] = funFacts;
-        
-                renderFunFactsView(funFacts);
                 isShowingFunFacts = true;
                 funFactButton.textContent = "Show Modern English";
-
-            } catch (error) {
-                console.error("Error generating fun facts:", error);
-                alert("Could not generate fun facts. See console for details.");
-            } finally {
-                funFactButton.disabled = false;
             }
+
+            originalPane.scrollTop = scrollPos;
+            dynamicPane.scrollTop = scrollPos;
+            setTimeout(enableScrollSync, 100);
         });
-        
-        function renderFunFactsView(facts) {
-            dynamicPaneTitle = dynamicPane.querySelector('h2');
+
+        async function renderFunFactsView(facts) {
             dynamicPaneTitle.textContent = "Fun Facts";
             const contentArea = dynamicPane;
             contentArea.innerHTML = '<h2>Fun Facts</h2>';
 
-            // The new ADK agent returns a simple {key: "fact text"} dictionary.
-            // The old implementation returned {key: {fact: "fact text"}}.
-            // This logic is updated to handle the new, simpler structure.
             for (const key in facts) {
                 if (facts[key] && typeof facts[key] === 'string') {
                     const card = document.createElement('div');
@@ -297,22 +346,22 @@
                 }
             }
         }
-        
-        function renderTranslationView() {
+
+        async function renderTranslationView() {
             dynamicPaneTitle.textContent = "Modern Translation";
             const contentArea = dynamicPane;
             contentArea.innerHTML = '<h2>Modern Translation</h2>';
 
             paragraphsData.forEach(p => {
                 const translatedP = document.createElement('p');
-                translatedP.id = `translated-${p.paragraph_id}`;
+                translatedP.id = `p-trans-${p.paragraph_id}`;
                 translatedP.textContent = p.translated_text;
                 contentArea.appendChild(translatedP);
             });
         }
 
         // --- INITIALIZATION ---
-        document.addEventListener('DOMContentLoaded', loadNovel);
+        document.addEventListener('DOMContentLoaded', initializePage);
     </script>
     
 </body>

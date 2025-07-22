@@ -266,6 +266,8 @@ python-multipart==0.0.20
     # via mcp
 pyyaml==6.0.2
     # via google-adk
+redis==6.2.0
+    # via -r requirements.in
 referencing==0.36.2
     # via
     #   jsonschema

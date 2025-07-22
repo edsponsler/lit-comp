@@ -68,22 +68,28 @@ class FunFactCoordinatorAgent(BaseAgent):
             # 2. Cache miss: Proceed with generation
             print(f"--- Cache miss for {cache_path}. Generating fun facts. ---")
 
-            # 3. Read the prepared book content to get the text segment
-            prepared_book_path = f"{base_book_name}_prepared.json"
-            print(f"--- Reading prepared book from: {prepared_book_path} ---")
-            book_data = json.loads(read_gcs_object(GCS_BUCKET_NAME, prepared_book_path))
-            paragraphs = [
-                p["original_text"]
-                for p in book_data.get("paragraphs", [])
-                if p.get("chapter_number") == self.chapter_number
-            ]
-            if not paragraphs:
-                error_msg = f"No paragraphs found for chapter {self.chapter_number} in {prepared_book_path}."
-                print(f"ERROR: {error_msg}", file=sys.stderr)
-                yield Event(author=self.name, content=Content(parts=[Part(text=error_msg)]))
-                return
-
-            text_segment = "\n".join(paragraphs)
+            # 3. Get the text segment for context.
+            #    PRIORITIZE segment from session state. Fallback to GCS.
+            text_segment = ctx.session.state.get("text_segment")
+            if text_segment:
+                print("--- Using text_segment provided in session state. ---")
+            else:
+                print("--- text_segment not in session state. Falling back to loading full chapter from GCS. ---")
+                prepared_book_path = f"{base_book_name}_prepared.json"
+                print(f"--- Reading prepared book from: {prepared_book_path} ---")
+                book_data = json.loads(read_gcs_object(GCS_BUCKET_NAME, prepared_book_path))
+                # Use the translated text for context, as that's what the user is reading.
+                paragraphs = [
+                    p.get("translated_text", p.get("original_text", ""))
+                    for p in book_data.get("paragraphs", [])
+                    if p.get("chapter_number") == self.chapter_number
+                ]
+                if not paragraphs:
+                    error_msg = f"No paragraphs found for chapter {self.chapter_number} in {prepared_book_path}."
+                    print(f"ERROR: {error_msg}", file=sys.stderr)
+                    yield Event(author=self.name, content=Content(parts=[Part(text=error_msg)]))
+                    return
+                text_segment = "\n\n".join(paragraphs)
 
             # 4. Generate fun facts in parallel
             tasks = []

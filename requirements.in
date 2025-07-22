@@ -4,6 +4,7 @@ google-cloud-storage
 google-cloud-translate
 python-dotenv
 deprecated # Required by google-adk for managing versioning warnings
-Flask[async]  # For running Flask asynchronously
+Flask[async]  # For running Flask in an asynchronous manner
 gunicorn # For running Flask in Cloud Run
 uvicorn # For running gunicorn with async workersgoogle-adk
+redis # For caching data in memory
