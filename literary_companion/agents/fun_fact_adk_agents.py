@@ -1,13 +1,15 @@
 # literary_companion/agents/fun_fact_adk_agents.py
 
 import json
+import sys
 from typing import AsyncGenerator, List
 
 from google.adk.agents import LlmAgent, BaseAgent, ParallelAgent
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events import Event, EventActions
 from google.genai.types import Content, Part
-from literary_companion.config import DEFAULT_AGENT_MODEL
+from literary_companion.config import DEFAULT_AGENT_MODEL, GCS_BUCKET_NAME
+from literary_companion.tools.gcs_tool import check_gcs_object_exists, read_gcs_object, write_gcs_object
 
 
 def get_generator_instruction(fact_type: str) -> str:
@@ -65,13 +67,15 @@ Base your fun fact on this text: {{text_segment}}
 class FunFactCoordinatorAgent(BaseAgent):
     """A Custom Agent to orchestrate the generation of multiple fun facts."""
     fun_fact_types: List[str]
+    book_name: str
+    chapter_number: int
     # The list holds agents that are, at a minimum, BaseAgents.
     # This aligns with the type of the _generator_agents variable used
     # for initialization, resolving the type conflict.
     generator_agents: List[BaseAgent]
     workflow_agent: ParallelAgent
 
-    def __init__(self, fun_fact_types: List[str]):
+    def __init__(self, fun_fact_types: List[str], book_name: str, chapter_number: int):
         # To avoid ambiguity from local variables shadowing class fields,
         # we use uniquely named local variables for construction.
         # Explicitly type the list as containing BaseAgent to satisfy the
@@ -90,6 +94,8 @@ class FunFactCoordinatorAgent(BaseAgent):
             name="FunFactCoordinator",
             sub_agents=[_workflow_agent],
             fun_fact_types=fun_fact_types,
+            book_name=book_name,
+            chapter_number=chapter_number,
             generator_agents=_generator_agents,
             workflow_agent=_workflow_agent,
         )
@@ -100,17 +106,39 @@ class FunFactCoordinatorAgent(BaseAgent):
         """The main orchestration logic for generating fun facts."""
         print("--- ADK FunFactCoordinator: Starting fun fact generation. ---")
 
-        # Run the parallel workflow to generate all fun facts
-        async for event in self.workflow_agent.run_async(ctx):
-            yield event
+        if not GCS_BUCKET_NAME:
+            error_msg = "Server configuration error: GCS_BUCKET_NAME is not set."
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+            # Yield an error event and stop
+            yield Event(author=self.name, content=Content(parts=[Part(text=error_msg)]))
+            return
 
-        # Aggregate the results from the session state
-        print(f"--- ADK FunFactCoordinator: Session state after workflow: {ctx.session.state} ---")
-        final_results = {}
-        for fact_type in self.fun_fact_types:
-            result_key = f"{fact_type}_result"
-            if result_key in ctx.session.state:
-                final_results[fact_type] = ctx.session.state[result_key]
+        cache_path = f"{self.book_name}/chapter_{self.chapter_number}_fun_facts.json"
+
+        try:
+            if check_gcs_object_exists(GCS_BUCKET_NAME, cache_path):
+                print(f"--- Cache hit for {cache_path}. Reading from GCS. ---")
+                cached_data = read_gcs_object(GCS_BUCKET_NAME, cache_path)
+                final_results = json.loads(cached_data)
+            else:
+                print(f"--- Cache miss for {cache_path}. Generating fun facts. ---")
+                # Run the parallel workflow to generate all fun facts
+                async for event in self.workflow_agent.run_async(ctx):
+                    yield event
+
+                # Aggregate the results from the session state
+                print(f"--- ADK FunFactCoordinator: Session state after workflow: {ctx.session.state} ---")
+                final_results = {}
+                for fact_type in self.fun_fact_types:
+                    result_key = f"{fact_type}_result"
+                    if result_key in ctx.session.state:
+                        final_results[fact_type] = ctx.session.state[result_key]
+
+                write_gcs_object(GCS_BUCKET_NAME, cache_path, json.dumps(final_results, indent=4))
+                print(f"--- Wrote fun facts to cache: {cache_path} ---")
+        except Exception as e:
+            print(f"--- Error during fun fact generation or caching: {e} ---")
+            final_results = {"error": str(e)}
 
         print(f"--- ADK FunFactCoordinator: Fun fact generation complete. Final results: {final_results} ---")
 

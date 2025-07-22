@@ -43,17 +43,65 @@ async def generate_fun_facts():
     Receives user progress and runs the FunFactCoordinatorAgent.
     """
     req_data = request.get_json()
-    text_segment = req_data.get("text_segment")
+    # text_segment is no longer used from the request.
+    # text_segment = req_data.get("text_segment")
     session_id = req_data.get("session_id")
     chapter_number = req_data.get("chapter_number")
     paragraph_in_chapter = req_data.get("paragraph_in_chapter")
     last_paragraph_in_chapter = req_data.get("last_paragraph_in_chapter")
     book_title = os.environ.get("GCS_FILE_NAME", "unknown-book").replace(".txt", "")
 
-    if not all([text_segment, session_id, chapter_number, paragraph_in_chapter, last_paragraph_in_chapter]):
+    # The text_segment is generated server-side, so it's removed from this check.
+    if not all([session_id, chapter_number, paragraph_in_chapter, last_paragraph_in_chapter]):
         return jsonify({"error": "Missing required fields"}), 400
 
     print("--- API: Received request for fun facts. ---")
+
+    # --- MODIFICATION: Start ---
+    # Instead of using a specific paragraph, we will construct a text segment
+    # based on the ENTIRE content of the current chapter.
+
+    # 1. Get the prepared novel content from GCS
+    bucket_name = os.environ.get("GCS_BUCKET_NAME")
+    source_file_name = os.environ.get("GCS_FILE_NAME")
+
+    if not bucket_name or not source_file_name:
+        return jsonify({"error": "GCS bucket or file name not configured on server."}), 500
+
+    prepared_file_name = source_file_name.replace('.txt', '_prepared.json')
+    
+    try:
+        content_str = read_gcs_object(bucket_name, prepared_file_name)
+        novel_data = json.loads(content_str)
+    except Exception as e:
+        print(f"--- API Error: Failed to read or parse novel content from GCS: {e} ---")
+        return jsonify({"error": "Failed to load novel content."}), 500
+
+    # 2. Extract all paragraphs of the current chapter
+    try:
+        # The prepared novel data has a flat list of paragraphs. We need to
+        # filter them by the requested chapter_number to get the text for
+        # the current chapter.
+        target_chapter = int(chapter_number)
+        current_chapter_paragraphs = [
+            p["translated_text"]
+            for p in novel_data.get("paragraphs", [])
+            if p.get("chapter_number") == target_chapter
+        ]
+
+        if not current_chapter_paragraphs:
+            return jsonify({"error": "Chapter has no paragraphs."}), 400
+
+        # 3. Construct the new text segment by joining all paragraphs
+        final_text_segment = "\n\n".join(current_chapter_paragraphs)
+        print(f"--- API: Constructed text segment for fun facts from entire Chapter {chapter_number}. ---")
+
+    except (ValueError, IndexError, KeyError) as e:
+        print(f"--- API Error: Could not extract paragraphs: {e} ---")
+        return jsonify({"error": "Failed to process chapter paragraphs."}), 500
+
+    # --- MODIFICATION: End ---
+
 
     # 1. Define the fun fact types to generate
     fun_fact_types = [
@@ -65,7 +113,11 @@ async def generate_fun_facts():
     ]
 
     # 2. Create the coordinator agent instance for this request
-    coordinator = FunFactCoordinatorAgent(fun_fact_types=fun_fact_types)
+    coordinator = FunFactCoordinatorAgent(
+        fun_fact_types=fun_fact_types,
+        book_name=book_title,
+        chapter_number=int(chapter_number),
+    )
 
     # 3. Initialize the runner with the new agent
     runner = Runner(
@@ -78,8 +130,8 @@ async def generate_fun_facts():
     # Use the session_id from the client as the ADK session_id
     adk_session_id = session_id
 
-    # 4. Create a session with the initial state containing the text segment
-    initial_state = {"text_segment": text_segment}
+    # 4. Create a session with the initial state containing the new, full-chapter text segment
+    initial_state = {"text_segment": final_text_segment}
     session_service_lc.create_session(
         app_name="literary-companion-adk", user_id=user_id, session_id=adk_session_id, state=initial_state
     )
