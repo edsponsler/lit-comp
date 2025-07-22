@@ -11,11 +11,10 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from literary_companion.agents.fun_fact_adk_agents import FunFactCoordinatorAgent
 from google.genai import types
-from literary_companion.tools.gcs_tool import read_gcs_object
 
 
 async def main(book_name: str, chapter_number: int):
-    """Runs the ADK-based fun fact generation workflow."""
+    """Runs the refactored, more efficient ADK-based fun fact generation workflow."""
     session_service = InMemorySessionService()
     app_name = "literary-companion-adk"
     user_id = "user-1234"
@@ -31,39 +30,26 @@ async def main(book_name: str, chapter_number: int):
     ]
 
     # 2. Create the coordinator agent
+    # The agent now handles its own data loading and caching.
     coordinator = FunFactCoordinatorAgent(
-        fun_fact_types=fun_fact_types, 
-        book_name=book_name, 
+        fun_fact_types=fun_fact_types,
+        book_name=book_name,
         chapter_number=chapter_number
     )
 
     # 3. Initialize the runner
     runner = Runner(agent=coordinator, app_name=app_name, session_service=session_service)
 
-    # 4. Create a session with the initial state
-    base_name, _ = os.path.splitext(book_name)
-    prepared_book_path = f"{base_name}_prepared.json"
-    try:
-        bucket_name = os.environ.get("GCS_BUCKET_NAME")
-        if not bucket_name:
-            print("Error: GCS_BUCKET_NAME environment variable is not set.", file=sys.stderr)
-            return
-
-        book_data = json.loads(read_gcs_object(bucket_name, prepared_book_path))
-        paragraphs = [p["original_text"] for p in book_data["paragraphs"] if p["chapter_number"] == chapter_number]
-        text_segment = "\n".join(paragraphs)
-    except Exception as e:
-        print(f"Error reading or processing book file: {e}")
-        return
-
-    initial_state = {"text_segment": text_segment}
+    # 4. Create a session with an empty initial state.
+    # The agent is now self-contained and will fetch its own data.
     session_service.create_session(
-        app_name=app_name, user_id=user_id, session_id=session_id, state=initial_state
+        app_name=app_name, user_id=user_id, session_id=session_id, state={}
     )
 
     # 5. Run the agent and wait for it to complete
     print(f"--- Running Fun Fact Generation for session: {session_id} ---")
-    content = types.Content(role="user", parts=[types.Part(text="Generate fun facts.")])
+    # The content of the message does not matter, it just triggers the agent.
+    content = types.Content(role="user", parts=[types.Part(text="Go.")])
     async for event in runner.run_async(user_id=user_id, session_id=session_id, new_message=content):
         # Let the loop run to completion to ensure all agents have finished.
         pass
@@ -75,7 +61,10 @@ async def main(book_name: str, chapter_number: int):
     final_result = final_session.state.get("final_fun_facts", {})
 
     print("\n--- Final Fun Facts ---")
-    print(json.dumps(final_result, indent=4))
+    if final_result:
+        print(json.dumps(final_result, indent=4))
+    else:
+        print("No fun facts were generated. Check logs for errors.")
     print("-----------------------\n")
 
 
@@ -84,4 +73,10 @@ if __name__ == "__main__":
     parser.add_argument("--book", required=True, help="The name of the book (e.g., 'frankenstein' or 'frankenstein.txt').")
     parser.add_argument("--chapter", type=int, required=True, help="The chapter number to generate fun facts for.")
     args = parser.parse_args()
+
+    # Ensure the GCS_BUCKET_NAME is set, as the agent now relies on it directly.
+    if not os.environ.get("GCS_BUCKET_NAME"):
+        print("Error: The GCS_BUCKET_NAME environment variable must be set.", file=sys.stderr)
+        sys.exit(1)
+
     asyncio.run(main(args.book, args.chapter))
