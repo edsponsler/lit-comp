@@ -51,29 +51,19 @@ async def main(bucket_name: str, file_name: str):
         session_id=session_id,
         new_message=initial_message
     ):
-        is_tool_call_event = (
-            event.content
-            and event.content.parts
-            and event.content.parts[0].function_call
-        )
-        is_text_event = (
-            event.content
-            and event.content.parts
-            and event.content.parts[0].text
-            and not event.is_final_response()
-        )
-
         if event.is_final_response():
             if event.content and event.content.parts:
                 final_text = event.content.parts[0].text
                 print("\n--- Agent Final Response ---")
                 print(final_text)
                 print("--------------------------\n")
-        elif is_tool_call_event:
-            print(f"--- Calling Tool: {event.content.parts[0].function_call.name} ---")
-        elif is_text_event:
-            thought_text = event.content.parts[0].text.strip()
-            print(f"--- Agent thought: \"{thought_text}\" ---")
+        # Use more robust checks that are also clearer to static analyzers.
+        # The walrus operator (:=) assigns the value to a variable if it exists,
+        # and the `if` statement then checks if that variable is truthy.
+        elif event.content and event.content.parts and (function_call := event.content.parts[0].function_call):
+            print(f"--- Calling Tool: {function_call.name} ---")
+        elif event.content and event.content.parts and (thought_text := event.content.parts[0].text) and not event.is_final_response():
+            print(f"--- Agent thought: \"{thought_text.strip()}\" ---")
 
     print("--- Preparation script finished. ---")
 

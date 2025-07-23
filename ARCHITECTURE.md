@@ -1,246 +1,122 @@
-# Literary Companion - Architectural Reference
+# Architecture Document: Literary Companion
 
 ## 1. Introduction
 
-The Literary Companion is a feature designed to enhance the experience of reading classic novels. It provides readers with a "modern English" translation of the text displayed alongside the original, and offers contextually relevant "fun facts" about the content being read. This is achieved through two main processes: a one-time book preparation phase and an interactive fun fact generation system.
+This document provides a comprehensive overview of the architecture of the Literary Companion application. It details the various components, their interactions, the deployment workflow, and the specific Google Cloud services utilized. The application is designed to assist users in preparing literary works and generating screenplays, leveraging large language models (LLMs) and cloud-native services.
 
 ## 2. Overall Architecture
 
-The Literary Companion module operates with two distinct workflows:
+The Literary Companion application follows a modular and cloud-native architecture, primarily deployed on Google Cloud Platform (GCP). It consists of a core Flask web application, background processing scripts, and a suite of specialized agents and tools that interact with various GCP services, particularly for LLM-driven tasks and data storage.
 
-*   **Book Preparation (Batch Workflow):** This is a one-time process per novel. It involves reading the novel's text, segmenting it into paragraphs, generating a modern English translation for each paragraph, and storing this structured data (original + translation) in Google Cloud Storage (GCS) for later use by the interactive reading UI.
-    *   Flow: `CLI Script -> BookPreparationCoordinator_v1 Agent -> book_processor_tool (from gcs_tool.py) -> translation_tool.py & GCS`
+```
++-------------------+     +---------------------+     +---------------------+
+|                   |     |                     |     |                     |
+|   User Interface  |<--->|  Flask Web App      |<--->|  Literary Agents    |
+|   (Browser)       |     |    (app.py)         |     |  (Book Prep, Screenplay) |
+|                   |     |                     |     |                     |
++-------------------+     +---------------------+     +---------------------+
+                                   |       ^
+                                   |       |
+                                   v       |
++---------------------+     +---------------------+     +---------------------+
+|                     |     |                     |     |                     |
+|  Background Scripts |<--->|  Specialized Tools  |<--->|  Google Cloud Services |
+|  (run_book_prep,    |     |  (GCS, Screenplay,  |     |  (Vertex AI, GCS,    |
+|   run_screenplay)   |     |   Translation)      |     |   Firestore, Cloud Run) |
+|                     |     |                     |     |                     |
++---------------------+     +---------------------+     +---------------------+
+```
 
-*   **Fun Fact Generation (Interactive Workflow):** This workflow is triggered as a user reads the prepared novel in the web UI. When the user requests fun facts for the current reading passage, the system generates several types of insights (e.g., historical context, character analysis).
-    *   Flow: `Web UI (literary_companion.html) -> Flask API (/generate_fun_facts) -> FunFactCoordinator_v1 Agent -> fun_fact_orchestrator_tool -> fun_fact_generators.py & fun_fact_micro_task_board_tool.py -> Vertex AI & Firestore`
+## 3. Core Application (`app.py`)
 
-## 3. Core Components (`literary_companion/`)
+`app.py` serves as the main entry point for the web application. It is a Flask-based application responsible for:
 
-The `literary_companion/` directory contains all the specialized Python modules developed for this feature.
+*   **Serving the User Interface**: Renders HTML templates (from the `templates/` directory) to provide the user-facing interface.
+*   **API Endpoints**: Exposes RESTful API endpoints for initiating workflows (e.g., book preparation, screenplay creation) and retrieving results.
+*   **Orchestration**: Interacts with the `literary_companion/agents/` to delegate complex, LLM-driven tasks.
+*   **Configuration**: Utilizes settings defined in `literary_companion/config.py`.
 
-### 3.1 Agents (`literary_companion/agents/`)
+## 4. Deployment Workflow
 
-These agents are built using the Google ADK and serve as orchestrators for specific tasks within the Literary Companion. They primarily coordinate complex Python functions exposed as tools.
+The application is containerized using Docker and deployed to Google Cloud Run, enabling a serverless, scalable, and cost-effective deployment model.
 
-*   **`BookPreparationCoordinator_v1` (`book_preparation_coordinator_v1.py`):**
-    *   **Role:** Manages the one-time processing and preparation of a novel.
-    *   **Functionality:**
-        *   Invoked by the `scripts/run_book_preparation.py` script.
-        *   Its primary task is to call the `book_processor_tool` (from `literary_companion/tools/gcs_tool.py`).
-        *   It passes the GCS bucket and file name of the novel to the tool.
-        *   The agent itself is simple, acting as an entry point to the more complex `book_processor_tool` workflow.
-    *   **Tools Used:** `book_processor_tool`.
+*   **Dockerfile**: Defines the build process for the Docker image. It uses a multi-stage build to create a lean final image, installing Python dependencies into a virtual environment and copying only the necessary application code.
+*   **.dockerignore**: Specifies files and directories to exclude from the Docker build context, ensuring a smaller and more secure image.
+*   **requirements.txt**: Lists all Python dependencies required by the application.
+*   **gcenv.sh.example / gcenv.sh**: A shell script template for managing environment variables (e.g., `PROJECT_ID`, `LOCATION`, `IMAGE_NAME`, `SERVICE_NAME`) specific to different deployment environments. This script is sourced before deployment.
+*   **deploy_cloud_run.sh**: An automated script that orchestrates the deployment to Cloud Run. It performs the following steps:
+    1.  Verifies that necessary environment variables are set.
+    2.  Prompts for user confirmation before proceeding.
+    3.  Deploys the Docker image to Google Cloud Run, configuring service parameters such as image URL, platform, region, authentication, CPU, memory, and environment variables.
+    4.  Outputs the Cloud Run service account name, which is crucial for subsequent IAM role assignments.
+*   **Google Cloud Run**: The serverless platform where the application runs. It automatically scales the application up and down based on traffic, including scaling to zero instances when idle.
+*   **Artifact Registry**: Google Cloud's universal package manager, used here to store the Docker images built for the application. The `deploy_cloud_run.sh` script pushes the built image to a designated Docker repository within Artifact Registry.
 
-*   **`FunFactCoordinator_v1` (`fun_fact_coordinator_v1.py`):**
-    *   **Role:** Manages the real-time generation of fun facts based on a user's reading progress.
-    *   **Functionality:**
-        *   Invoked by the Flask application (`app.py`) when the `/generate_fun_facts` API endpoint is called.
-        *   Receives a text segment (the portion of the novel read so far), a `session_id`, and an `agency_task_id`.
-        *   Its sole responsibility is to call the `fun_fact_orchestrator_tool` (from `literary_companion/tools/fun_fact_orchestrator.py`), passing along the received arguments.
-        *   Returns the JSON result from the `fun_fact_orchestrator_tool` back to the Flask app.
-    *   **Tools Used:** `fun_fact_orchestrator_tool`.
+## 5. Book Preparation Workflow
 
-### 3.2 Tools (`literary_companion/tools/`)
+This workflow processes raw book files, preparing them for further analysis or use within the application.
 
-These tools provide specific functionalities used by the agents or other parts of the Literary Companion system.
+*   **Trigger**: Initiated via `scripts/run_book_preparation.py`, which can be run as a background job or manually.
+*   **Agent**: `literary_companion/agents/book_preparation_coordinator_v1.py`. This agent is responsible for:
+    *   Receiving a raw book file (e.g., from GCS).
+    *   Orchestrating the parsing, cleaning, and structuring of the book content.
+    *   Potentially interacting with LLMs for tasks like summarization or entity extraction.
+    *   Storing the processed book data.
+*   **Tools Used**:
+    *   `literary_companion/tools/gcs_tool.py`: Used for reading raw book files from a Google Cloud Storage bucket and writing the processed book data back to GCS.
+*   **Output**: Structured, processed book data stored in Google Cloud Storage, ready for subsequent workflows.
 
-*   **`gcs_tool.py`:**
-    *   **Role:** Handles all interactions with Google Cloud Storage for reading and writing novel content.
-    *   **Key Functions/Tools:**
-        *   `read_text_from_gcs(bucket_name, file_name)`: Reads raw text from a GCS file. Used by `app.py` via the `/api/get_novel_content` endpoint to serve prepared novel JSON.
-        *   `write_text_to_gcs(bucket_name, file_name, content)`: Writes text content to a GCS file. (Used internally by `process_and_translate_book`).
-        *   `process_and_translate_book(bucket_name, file_name)` (exposed as `book_processor_tool`):
-            *   Orchestrates the entire book preparation workflow.
-            *   Reads the original novel text from GCS.
-            *   Splits the text into paragraphs.
-            *   For each paragraph, it calls `translation_tool.translate_text` to get the modern English version.
-            *   Constructs a JSON object containing pairs of original and translated paragraphs.
-            *   Writes this JSON object to a new file in GCS (e.g., `original_filename_prepared.json`).
-            *   This is the tool used by `BookPreparationCoordinator_v1`.
+## 6. Screenplay Creation Workflow
 
-*   **`translation_tool.py`:**
-    *   **Role:** Provides text translation capability, specifically for converting classic literary language into modern, easily understandable English.
-    *   **Key Functions/Tools:**
-        *   `translate_text(text)`: Takes a string of text. Uses a generative AI model (Vertex AI, using the model specified by the `DEFAULT_AGENT_MODEL` environment variable, loaded from `literary_companion.config`) to perform a stylistic translation/rephrasing. It's not translating between different languages but rather modernizing the English style. Used by `process_and_translate_book`.
+This workflow generates a screenplay based on provided input, likely leveraging the processed book data.
 
-*   **`fun_fact_orchestrator.py`:**
-    *   **Role:** Manages the entire multi-step process of generating a set of fun facts for a given text segment. This is a deterministic Python workflow, not an AI agent.
-    *   **Key Functions/Tools:**
-        *   `run_fun_fact_generation(text_segment, session_id, agency_task_id)` (exposed as `fun_fact_orchestrator_tool`):
-            *   Defines a list of fun fact categories (e.g., "historical_context", "geographical_setting").
-            *   For each category:
-                *   It posts an initial "new_task" entry to the `fun_fact_micro_task_board` (using `fun_fact_micro_task_board_tool.post_micro_entry`).
-                *   It calls the corresponding `analyze_<category>` function from `literary_companion/lib/fun_fact_generators.py`, passing the `text_segment`.
-                *   It posts the result from the generator function as a "completed" task entry to the `fun_fact_micro_task_board`.
-            *   After processing all categories, it retrieves all "completed" entries for the given `agency_task_id` from the micro-task board.
-            *   Aggregates these results into a single JSON object where keys are fact categories and values are the generated facts.
-            *   Returns this JSON object as a string.
-            *   This is the tool used by `FunFactCoordinator_v1`.
+*   **Trigger**: Initiated via `scripts/run_screenplay_creation.py`, which can be run as a background job or manually.
+*   **Agent**: `literary_companion/agents/screenplay_coordinator_v1.py`. This agent is responsible for:
+    *   Taking input (e.g., processed book data, user prompts).
+    *   Coordinating the generation of a screenplay, likely involving multiple LLM calls for character development, scene descriptions, dialogue, etc.
+    *   Structuring the generated screenplay into a desired format.
+*   **Tools Used**:
+    *   `literary_companion/tools/screenplay_generator_tool.py`: A specialized tool that encapsulates the logic for interacting with LLMs to generate screenplay elements.
+    *   `literary_companion/tools/gcs_tool.py`: Used for reading input data (e.g., processed book) from GCS and writing the final generated screenplay to GCS.
+*   **Output**: A complete screenplay document stored in Google Cloud Storage.
 
-*   **`fun_fact_micro_task_board_tool.py`:**
-    *   **Role:** Provides functions to interact with a dedicated Firestore collection (`fun_fact_micro_task_board`) that acts as a status and results board for the individual generation tasks within the `fun_fact_orchestrator_tool`.
-    *   **Key Functions:**
-        *   `post_micro_entry(...)`: Writes or updates an entry on the board. Used by `fun_fact_orchestrator_tool` to log the start and completion of each fun fact generation sub-task (e.g., generating "historical_context").
-        *   `get_micro_entries(...)`: Retrieves entries from the board, typically filtered by `agency_task_id` and `task_type` or `status`. Used by `fun_fact_orchestrator_tool` to collect all results before aggregation.
-    *   This board serves a more fine-grained, internal purpose for the `fun_fact_orchestrator_tool`.
+## 7. Key Components and Tools
 
-### 3.3 Libraries (`literary_companion/lib/`)
+Beyond the core workflows, several shared components and tools facilitate the application's functionality:
 
-These are supporting Python libraries that contain core business logic.
+*   **`literary_companion/lib/fun_fact_generators.py`**: Contains logic for generating "fun facts," likely by querying LLMs with specific prompts based on input text.
+*   **`literary_companion/tools/translation_tool.py`**: Provides functionality for translating text, leveraging LLMs or dedicated translation APIs.
+*   **`literary_companion/tools/gcs_tool.py`**: A utility module for interacting with Google Cloud Storage. It provides functions for uploading and downloading blobs (files) to and from specified GCS buckets. This tool is fundamental for handling large input files (books) and storing processed outputs (prepared books, screenplays).
+*   **`literary_companion/config.py`**: A centralized configuration file that stores application-wide settings, such as Google Cloud project IDs, bucket names, and LLM model names. This promotes maintainability and allows for easy adjustment of parameters across different environments.
 
-*   **`fun_fact_generators.py`:**
-    *   **Role:** Contains the actual logic for generating individual fun facts.
-    *   **Functionality:**
-        *   Provides a set of functions, each named `analyze_<category>(text)` (e.g., `analyze_historical_context`, `analyze_character_sentiments`).
-        *   Each function takes the text segment as input.
-        *   Constructs a specific prompt tailored to the fact category.
-        *   Makes a direct call to a generative AI model (Vertex AI, using the model specified by the `DEFAULT_AGENT_MODEL` environment variable) with the prompt and text to generate the fun fact.
-        *   Returns a dictionary containing the status and the generated fact text.
-        *   These functions are called by the `fun_fact_orchestrator_tool`.
+## 8. Caching Mechanism
 
-## 4. Web Application Integration
+The application leverages Google Cloud Storage (GCS) as a persistent caching mechanism for the outputs of long-running and computationally expensive processes, specifically the book preparation and screenplay creation workflows.
 
-The Literary Companion feature is integrated into the main Flask web application (`app.py`) and has its own dedicated user interface.
+*   **Mechanism**: Before initiating a book preparation or screenplay generation task, the system first checks if a pre-computed or pre-processed version of the output already exists in a designated GCS bucket. This check is typically based on a unique identifier derived from the input (e.g., a hash of the book content or a combination of input parameters for screenplay generation).
+*   **How it Works**:
+    1.  When a request for book preparation or screenplay generation comes in, the relevant agent (e.g., `BookPreparationCoordinatorV1`) computes a unique key for the expected output.
+    2.  It then uses `gcs_tool.py` to check if a blob with this key exists in the designated GCS cache bucket.
+    3.  If the blob exists, the agent downloads the cached output directly from GCS and returns it, bypassing the entire processing pipeline.
+    4.  If the blob does not exist, the agent proceeds with the full computation (e.g., LLM calls, data processing).
+    5.  Once the computation is complete, the agent uploads the newly generated output to the GCS cache bucket using the computed key, making it available for future requests.
 
-*   **Flask Application (`app.py`) Integration:**
-    *   **`/` route:** Redirects to the `/literary_companion` page.
-    *   **`/literary_companion` route:** Serves the main HTML page for the feature (`templates/literary_companion/literary_companion.html`).
-    *   **`/api/get_novel_content` endpoint (GET):**
-        *   Called by the `literary_companion.html` frontend to fetch the prepared novel data.
-        *   Uses `literary_companion.tools.gcs_tool.read_text_from_gcs()` to read the processed JSON file (containing original and modern translated paragraphs) from GCS.
-        *   Returns the novel data as a JSON response.
-    *   **`/generate_fun_facts` endpoint (POST):**
-        *   Called by `literary_companion.html` when the user requests fun facts.
-        *   Receives a JSON payload with `text_segment` (the portion of the novel read so far) and `session_id`.
-        *   Invokes the `FunFactCoordinator_v1` agent via the ADK `Runner`.
-        *   Passes the `text_segment`, `session_id`, and a newly generated `agency_task_id` to the agent.
-        *   Returns the JSON response from the agent (which contains the aggregated fun facts) to the frontend.
+*   **Advantages Compared to Not Using a Cache**:
+    *   **Reduced Computation Cost**: The most significant advantage is avoiding redundant execution of expensive LLM calls and complex data processing. This directly translates to lower operational costs, especially for services like Vertex AI which are billed per token or per request.
+    *   **Faster Response Times**: For repeated requests or common inputs, the system can serve results almost instantaneously from the cache, dramatically improving user experience by reducing latency from minutes (for full processing) to seconds (for cache retrieval).
+    *   **Improved Scalability and Throughput**: By offloading repeated computations to the cache, the system can handle a higher volume of requests without needing to scale up its compute resources (e.g., Cloud Run instances, LLM quotas) proportionally. This reduces contention for LLM APIs.
+    *   **Enhanced Resilience and Reliability**: Cached results provide a fallback. If the underlying LLM service experiences an outage or the processing pipeline encounters an error, previously computed results can still be served from the cache, maintaining partial service availability.
+    *   **Reduced API Quota Consumption**: For LLM services with rate limits or quotas, caching helps stay within those limits by minimizing the number of actual API calls.
 
-*   **User Interface (`templates/literary_companion/literary_companion.html`):**
-    *   **Structure:**
-        *   Displays two main panes: one for the original novel text and one for the "dynamic content."
-        *   The dynamic content pane initially shows the modern English translation of the novel.
-        *   A "Show Fun Facts" button allows the user to toggle the dynamic content pane to display fun facts.
-    *   **Functionality:**
-        *   **Loading Novels:** On page load, it calls the `/api/get_novel_content` endpoint to fetch and display the original and translated paragraphs.
-        *   **Synchronized Scrolling:** Implements synchronized scrolling between the original text pane and the modern translation pane. As the user scrolls the original text, the translation pane attempts to keep the corresponding paragraph in view. It uses an `IntersectionObserver` to track the currently visible paragraph in the original text.
-        *   **Fun Fact Generation:**
-            *   When the "Show Fun Facts" button is clicked:
-                *   It identifies the `lastVisibleParagraphId` from the original text pane.
-                *   It constructs the `text_segment` by concatenating all original paragraphs from the beginning up to and including the `lastVisibleParagraphId`.
-                *   It calls the `/generate_fun_facts` backend endpoint with this `text_segment` and a unique `readingSessionId`.
-                *   Displays the returned fun facts in the dynamic content pane, replacing the modern translation.
-                *   The button text changes to "Show Modern English" to allow toggling back.
-            *   **Caching:** Fun facts are cached locally in the browser (`funFactsCache` JavaScript variable, keyed by `lastVisibleParagraphId`) to avoid redundant API calls if the user requests facts for the same passage again.
+## 9. Google Cloud Services Utilized
 
-## 5. Data Flow and Orchestration
+The Literary Companion application heavily relies on the following Google Cloud services:
 
-This section details the step-by-step processes for the two main workflows.
-
-### 5.1 Book Preparation Data Flow (Batch)
-
-1.  **Initiation:** A developer or administrator runs the `scripts/run_book_preparation.py` script from the command line, providing GCS bucket and input novel file name (e.g., `python scripts/run_book_preparation.py --bucket my-bucket --file moby_dick.txt`).
-2.  **Agent Invocation:** The script initializes the ADK Runner and invokes the `BookPreparationCoordinator_v1` agent with a prompt containing the bucket and file name.
-3.  **Tool Call:** The `BookPreparationCoordinator_v1` agent, as per its instructions, calls the `book_processor_tool` (which is `literary_companion.tools.gcs_tool.process_and_translate_book`) with the provided bucket and file name.
-4.  **Book Processing (`process_and_translate_book` tool):**
-    *   **Read Original:** The tool reads the full text of the novel from `gs://<bucket_name>/<file_name>`.
-    *   **Paragraph Segmentation:** The text is split into paragraph blocks based on double newline characters.
-    *   **Translation Loop:** For each paragraph:
-        *   The paragraph text is cleaned (extra newlines removed).
-        *   `literary_companion.tools.translation_tool.translate_text()` is called with the cleaned paragraph. This function internally uses a Vertex AI generative model to produce a modern English version.
-        *   If translation is successful, an object containing `paragraph_id`, `original_text`, and `translated_text` is created.
-    *   **Aggregation:** All such paragraph objects are collected into a list under a top-level `paragraphs` key.
-    *   **Write Prepared JSON:** The aggregated list is serialized to a JSON string. This JSON string is then written to a new file in GCS, typically named `<file_name_without_ext>_prepared.json` (e.g., `gs://<bucket_name>/moby_dick_prepared.json`).
-5.  **Completion:** The `book_processor_tool` returns a success or error message to the `BookPreparationCoordinator_v1` agent, which then provides this as its final response. The `run_book_preparation.py` script prints this final response.
-
-### 5.2 Fun Fact Generation Data Flow (Interactive)
-
-1.  **User Action:** The user is reading a novel in `literary_companion.html` and scrolls to a certain point. The `lastVisibleParagraphId` is updated by the `IntersectionObserver`.
-2.  **Request Fun Facts:** The user clicks the "Show Fun Facts" button.
-3.  **Frontend Logic (`literary_companion.html` JavaScript):**
-    *   Checks if fun facts for `lastVisibleParagraphId` are already in `funFactsCache`. If so, renders them and stops.
-    *   Constructs `text_segment`: all original text from the beginning of the novel up to `lastVisibleParagraphId`.
-    *   Generates a `readingSessionId`.
-    *   Sends a POST request to `/generate_fun_facts` with a JSON body: `{ "text_segment": textSegment, "session_id": readingSessionId }`.
-4.  **API Handling (`app.py`):**
-    *   The `/generate_fun_facts` endpoint receives the request.
-    *   It generates a unique `agency_task_id` for this specific request.
-    *   It initializes an ADK `Runner` with the `FunFactCoordinator_v1` agent.
-    *   It invokes the agent with a prompt containing the `text_segment`, `session_id` (which is the `readingSessionId` from frontend), and the new `agency_task_id`.
-5.  **Agent Tool Call (`FunFactCoordinator_v1`):**
-    *   The agent calls the `fun_fact_orchestrator_tool` (which is `literary_companion.tools.fun_fact_orchestrator.run_fun_fact_generation`), passing through `text_segment`, `session_id`, and `agency_task_id`.
-6.  **Orchestration (`run_fun_fact_generation` tool):**
-    *   **Define Tasks:** A predefined list of fun fact types is established (e.g., "historical_context", "geographical_setting").
-    *   **Log New Tasks:** For each fact type, `fun_fact_micro_task_board_tool.post_micro_entry` is called to create a "new_task" record in the `fun_fact_micro_task_board` Firestore collection, associated with the `agency_task_id`. This record includes the `text_segment` as input.
-    *   **Generate Facts Loop:** For each fact type:
-        *   The corresponding `analyze_<fact_type>()` function from `literary_companion.lib.fun_fact_generators` is called with the `text_segment`.
-        *   **Individual Fact Generation (`fun_fact_generators.analyze_*`):** The specific generator function forms a prompt, calls the Vertex AI generative model, and gets a fact string in return.
-        *   `fun_fact_micro_task_board_tool.post_micro_entry` is called again to update/create a "completed" record in Firestore for that fact type, storing the generated fact in `output_payload`.
-    *   **Aggregate Results:** After all fact types are processed, `fun_fact_micro_task_board_tool.get_micro_entries` is called to retrieve all "completed" task entries for the current `agency_task_id`.
-    *   The results are compiled into a single JSON object (e.g., `{"historical_context": {"status": "success", "fact": "..."}}`).
-    *   This JSON object is returned as a string.
-7.  **Response to Frontend:**
-    *   The `FunFactCoordinator_v1` agent returns the JSON string from the tool.
-    *   `app.py` sends this JSON string as the HTTP response to the frontend.
-8.  **Display Fun Facts (`literary_companion.html` JavaScript):**
-    *   The frontend receives the JSON.
-    *   The fun facts are cached in `funFactsCache[lastVisibleParagraphId]`.
-    *   The dynamic content pane is cleared and repopulated with the fun facts, each displayed in a "card" format.
-    *   The button text changes to "Show Modern English."
-
-## 6. State Management
-
-State within the Literary Companion module is managed in a few key ways, differing by workflow:
-
-*   **Google Cloud Storage (GCS):**
-    *   **Role:** Persistent storage for novel content.
-    *   **Usage:**
-        *   Stores the original raw text files of novels (e.g., `moby_dick.txt`).
-        *   Stores the processed/prepared novel files (e.g., `moby_dick_prepared.json`). These JSON files contain the original text and modern translation, paragraph by paragraph, and are the primary source for the reading UI.
-    *   This is the long-term storage for the "state" of the books themselves.
-
-*   **Firestore (`fun_fact_micro_task_board` collection):**
-    *   **Role:** Temporary, fine-grained task tracking and results storage specifically for the `fun_fact_orchestrator_tool`.
-    *   **Usage:**
-        *   When `run_fun_fact_generation` is executed, it logs "new_task" entries for each type of fun fact it intends to generate (historical, geographical, etc.) under a specific `agency_task_id`.
-        *   As each fun fact is generated by `fun_fact_generators.py`, the corresponding entry in Firestore is updated to "completed" and includes the generated `output_payload`.
-        *   The orchestrator then reads these "completed" entries to aggregate the final set of fun facts.
-    *   **Nature:** This is more of a transient operational datastore for a single, complex tool execution rather than long-term state. Entries are primarily useful during the lifecycle of a single `/generate_fun_facts` API call.
-
-*   **Client-Side (Browser) State (`literary_companion.html`):**
-    *   **Role:** Manages UI state and caches data to improve user experience and reduce redundant API calls.
-    *   **Usage:**
-        *   `paragraphsData`: Stores the currently loaded novel's paragraph objects (original and translated text).
-        *   `lastVisibleParagraphId`: Tracks the ID of the paragraph most recently scrolled into view in the original text pane.
-        *   `funFactsCache`: A JavaScript object that caches the fun facts received from the API, keyed by `lastVisibleParagraphId`. This prevents re-fetching fun facts for the same text segment.
-        *   `isShowingFunFacts`: Boolean flag to toggle the view in the dynamic pane between modern translation and fun facts.
-        *   `readingSessionId`: A unique ID for the user's current reading session, passed to the backend.
-
-## 7. Key Libraries and Technologies
-
-The Literary Companion module leverages several key Python libraries and Google Cloud technologies:
-
-*   **Google Agent Development Kit (google-adk):** Used for the `BookPreparationCoordinator_v1` and `FunFactCoordinator_v1` agents, enabling them to be invoked via the ADK Runner and to use ADK Tools (`FunctionTool`).
-*   **Flask (Flask\[async]):** The main web framework used by `app.py` to serve the `literary_companion.html` page and provide the API endpoints (`/api/get_novel_content`, `/generate_fun_facts`).
-*   **Google Cloud Vertex AI:** Directly used by `literary_companion.lib.fun_fact_generators.py` and `literary_companion.tools.translation_tool.py` to interact with generative AI models (specified by the `DEFAULT_AGENT_MODEL` environment variable, which is loaded in `literary_companion.config`) for generating fun facts and modern English translations.
-*   **Google Cloud Storage (GCS):** Used for storing original novel text files and the processed JSON files containing original and translated paragraphs. Accessed via `google-cloud-storage` library in `gcs_tool.py`.
-*   **Google Cloud Firestore:** Used by `fun_fact_micro_task_board_tool.py` to implement the `fun_fact_micro_task_board` collection. This provides a basic task tracking and results storage mechanism for the `fun_fact_orchestrator_tool`. Accessed via `google-cloud-firestore` library.
-*   **Python Standard Libraries:**
-    *   `json`: For serializing and deserializing data (e.g., prepared novel content, fun facts).
-    *   `re`: For regular expressions, used in `gcs_tool.py` to split novel text into paragraphs.
-    *   `uuid`: For generating unique IDs (e.g., `agency_task_id` in `app.py`, entry IDs in `fun_fact_micro_task_board_tool.py`).
-    *   `asyncio`: Used by `scripts/run_book_preparation.py` to run the ADK agent.
-    *   `argparse`: Used by `scripts/run_book_preparation.py` to handle command-line arguments.
-*   **No specific HTML/CSS/JS frameworks:** The `literary_companion.html` uses vanilla JavaScript, HTML, and CSS for its frontend logic and presentation.
-
-## 8. Scripts
-
-Associated scripts provide command-line interfaces for specific operations.
-
-*   **`scripts/run_book_preparation.py`:**
-    *   **Purpose:** To initiate the one-time batch processing of a novel.
-    *   **Usage:**
-        ```bash
-        python scripts/run_book_preparation.py --bucket <your-gcs-bucket-name> --file <path-to-novel-in-bucket.txt>
-        ```
-    *   **Functionality:** Takes GCS bucket and file path as arguments. It then invokes the `BookPreparationCoordinator_v1` agent to process the specified novel. The agent, through the `book_processor_tool`, will read the novel, translate it paragraph by paragraph into modern English, and save the structured result (original + translation) as a JSON file back to the same GCS bucket with a `_prepared.json` suffix. This script is essential for making new novels available to the Literary Companion UI.
+*   **Cloud Run**: The primary serverless compute platform for hosting the Flask web application. It provides automatic scaling, traffic management, and integrates seamlessly with other GCP services.
+*   **Artifact Registry**: Used for secure and private storage of Docker container images.
+*   **Vertex AI**: Google Cloud's machine learning platform, specifically utilized for accessing Large Language Models (LLMs). This service powers the generative capabilities for tasks like fun fact generation, translation, book summarization, and screenplay creation.
+*   **Cloud Storage (GCS)**: A highly scalable and durable object storage service. It serves multiple purposes:
+    *   **Raw Input Storage**: Stores the original book files uploaded by users.
+    *   **Processed Data Storage**: Stores the intermediate and final outputs of workflows, such as prepared book data and generated screenplays.
+    *   **Caching Layer**: Acts as the persistent cache for computationally expensive results, as detailed in Section 8.
+*   **Firestore (in Datastore mode)**: A NoSQL document database used for storing application metadata, user data, or potentially tracking the status of long-running tasks. The `deploy_cloud_run.sh` script explicitly requests the `Cloud Datastore User` IAM role, indicating its usage.

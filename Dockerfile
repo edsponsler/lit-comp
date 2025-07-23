@@ -1,29 +1,43 @@
-# Use an official Python runtime as a parent image
+# Dockerfile
+
+# --- Stage 1: Builder ---
+# This stage installs dependencies into a virtual environment. Using a separate
+# stage keeps the final image smaller and more secure.
+FROM python:3.12-slim AS builder
+
+# Create and activate a virtual environment
+ENV VIRTUAL_ENV=/opt/venv
+RUN python -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --timeout=100 -r requirements.txt
+
+# --- Stage 2: Final Image ---
+# This stage copies only the necessary application code and the installed
+# dependencies from the builder stage.
 FROM python:3.12-slim
 
-# Set environment variables
-# PYTHONUNBUFFERED ensures that python output is sent straight to the terminal
-# without being first buffered, which is useful for logging.
-ENV PYTHONUNBUFFERED=True
-# PORT is the standard environment variable for Cloud Run to specify the listening port.
-ENV PORT=8080
-
-# Set the working directory in the container
 WORKDIR /app
 
-# Copy the dependencies file to the working directory
-COPY requirements.txt .
+# Copy the virtual environment from the builder stage
+COPY --from=builder /opt/venv /opt/venv
 
-# Install any needed packages specified in requirements.txt
-# --no-cache-dir reduces image size.
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy only the necessary application code
+COPY app.py .
+COPY literary_companion ./literary_companion
+COPY templates ./templates
 
-# Copy the rest of the application's code to the working directory
-COPY . .
+# Activate the virtual environment for the running container
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Command to run the application using Gunicorn.
-# Gunicorn is a robust production-ready WSGI server.
-# We bind to the port specified by the $PORT environment variable set by Cloud Run.
-# --preload loads application code before forking workers, which can save memory.
-# We use 'sh -c' to ensure the $PORT environment variable is correctly expanded.
+# Expose the port the app runs on
+EXPOSE 8080
+
+# Define environment variable for the port
+ENV PORT=8080
+ENV GOOGLE_GENAI_USE_VERTEXAI=TRUE
+# Use exec form to properly handle signals and environment variable expansion
 CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 8 --preload app:app"]
