@@ -68,6 +68,7 @@ async def main(bucket: str, file: str, chapters: str, use_mocks: bool):
             print(f"Error: Could not retrieve paragraphs for '{chapters}'. Aborting.", file=sys.stderr)
             return
         initial_state["paragraphs"] = paragraphs
+        initial_state["folder_name"] = file.replace('.txt', '')
 
     app_name = "literary-companion-screenwriter-v2"
     session_service = InMemorySessionService()

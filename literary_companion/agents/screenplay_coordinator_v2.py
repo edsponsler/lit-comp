@@ -9,7 +9,8 @@ from typing_extensions import override
 from google.adk.agents import LlmAgent, BaseAgent
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events import Event, EventActions
-from literary_companion.config import DEFAULT_AGENT_MODEL
+from literary_companion.config import DEFAULT_AGENT_MODEL, GCS_BUCKET_NAME
+from literary_companion.tools.gcs_tool import write_gcs_object
 from google.genai.types import GenerateContentConfig, Content, Part
 
 logging.basicConfig(level=logging.INFO)
@@ -164,26 +165,59 @@ class ScreenplayCoordinatorV2(BaseAgent):
         for p in paragraphs:
             chapters[p["chapter_number"]].append(p["translated_text"])
 
+        # Define a chunk size for processing paragraphs to avoid hitting token limits.
+        PARAGRAPH_CHUNK_SIZE = 10
+
         final_screenplays_by_chapter = {}
         # Loop through each chapter to generate a separate screenplay
         for chapter_num in sorted(chapters.keys()):
             logger.info(f"[{self.name}] --- Starting screenplay for Chapter {chapter_num} ---")
 
-            # --- Generate Scenes for the current chapter ---
-            chapter_text = "\n\n".join(chapters[chapter_num])
-            scene_gen_ctx = ctx.model_copy(update={"session": ctx.session.model_copy(update={"state": {"novel_text": chapter_text}})})
-            
-            async for event in self.scene_generator.run_async(scene_gen_ctx):
-                yield event
-            
-            scenes_text = ctx.session.state.pop("scenes", None)
-            scenes_for_chapter = _clean_and_parse_json(scenes_text, f"{self.name}-Chap{chapter_num}")
+            # --- Generate Scenes for the current chapter in chunks ---
+            chapter_paragraphs = chapters[chapter_num]
+            scenes_for_chapter = []
+
+            for i in range(0, len(chapter_paragraphs), PARAGRAPH_CHUNK_SIZE):
+                chunk = chapter_paragraphs[i:i + PARAGRAPH_CHUNK_SIZE]
+                chunk_text = "\n\n".join(chunk)
+                logger.info(f"[{self.name}] Processing chunk {i//PARAGRAPH_CHUNK_SIZE + 1} for Chapter {chapter_num} ({len(chunk)} paragraphs)...")
+
+                scene_gen_ctx = ctx.model_copy(update={"session": ctx.session.model_copy(update={"state": {"novel_text": chunk_text}})})
+
+                async for event in self.scene_generator.run_async(scene_gen_ctx):
+                    yield event
+
+                scenes_text = ctx.session.state.pop("scenes", None)
+                scenes_from_chunk = _clean_and_parse_json(scenes_text, f"{self.name}-Chap{chapter_num}-Chunk{i//PARAGRAPH_CHUNK_SIZE + 1}")
+
+                if scenes_from_chunk:
+                    scenes_for_chapter.extend(scenes_from_chunk)
 
             if not scenes_for_chapter:
                 logger.warning(f"[{self.name}] No scenes generated for Chapter {chapter_num}. Skipping.")
                 continue
+
+            # --- Save scene list to GCS ---
+            folder_name = ctx.session.state.get("folder_name")
+            if folder_name and GCS_BUCKET_NAME and not use_mocks:
+                scene_list_filename = f"{folder_name}/chapter_{chapter_num}_scenelist.json"
+                try:
+                    # scenes_for_chapter is a list of dicts, which is JSON serializable
+                    scene_list_json_str = json.dumps(scenes_for_chapter, indent=4)
+                    write_gcs_object(
+                        GCS_BUCKET_NAME, scene_list_filename, scene_list_json_str
+                    )
+                    logger.info(
+                        f"[{self.name}] Saved scene list for Chapter {chapter_num} to "
+                        f"gs://{GCS_BUCKET_NAME}/{scene_list_filename}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"[{self.name}] Failed to save scene list for Chapter {chapter_num}: {e}"
+                    )
+            # --- End save ---
             
-            logger.info(f"[{self.name}] Generated {len(scenes_for_chapter)} scenes for Chapter {chapter_num}.")
+            logger.info(f"[{self.name}] Generated a total of {len(scenes_for_chapter)} scenes for Chapter {chapter_num}.")
 
             # --- Generate Creative Prompts for this chapter's scenes ---
             scenes_with_prompts = []
