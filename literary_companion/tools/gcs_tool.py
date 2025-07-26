@@ -6,6 +6,7 @@ import tempfile
 import time
 import concurrent.futures
 from typing import List, Optional
+from google.api_core.exceptions import NotFound
 
 from google.cloud import storage
 from google.adk.tools import FunctionTool
@@ -47,6 +48,9 @@ def read_gcs_object(bucket_name: str, object_name: str) -> str:
         content = blob.download_as_text()
         logging.info(f"Successfully read {len(content)} chars from gs://{bucket_name}/{object_name}")
         return content
+    except NotFound:
+        # Let the caller handle the "Not Found" case specifically.
+        raise
     except Exception as e:
         logging.error(f"Error reading from GCS: {e}", exc_info=True)
         raise IOError(f"Could not read gs://{bucket_name}/{object_name}") from e

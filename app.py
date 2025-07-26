@@ -5,6 +5,7 @@ import redis
 import vertexai
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from google.adk.runners import Runner
+from google.api_core.exceptions import NotFound
 from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
 from literary_companion.tools.gcs_tool import read_gcs_object
@@ -109,6 +110,33 @@ def get_book_chapter():
         return jsonify({"paragraphs": chapter_paragraphs})
     except Exception as e:
         return jsonify({"error": f"Could not load chapter {chapter_number} for {book_name}: {e}"}), 500
+
+
+@app.route("/api/get_screenplay", methods=["POST"])
+def get_screenplay():
+    """Fetches the screenplay for a specific chapter."""
+    req_data = request.get_json()
+    book_name = req_data.get("book_name")
+    chapter_number = req_data.get("chapter_number")
+
+    if not all([book_name, chapter_number is not None]):
+        return jsonify({"error": "Missing 'book_name' or 'chapter_number'"}), 400
+
+    try:
+        # The screenplay is stored in a folder named after the book, without the .txt extension.
+        folder_name = book_name.replace('.txt', '')
+        object_name = f"{folder_name}/chapter_{chapter_number}_screenplay.md"
+        
+        screenplay_content = read_gcs_object(GCS_BUCKET_NAME, object_name)
+        return jsonify({"screenplay": screenplay_content})
+    except NotFound:
+        app.logger.info(f"Screenplay not found for chapter {chapter_number} of {book_name}. Returning 404.")
+        # The frontend will handle this and display a user-friendly message.
+        return jsonify({"error": "Screenplay not found"}), 404
+    except Exception as e:
+        app.logger.error(f"Failed to read screenplay for chapter {chapter_number} of {book_name}: {e}")
+        return jsonify({"error": f"Could not load screenplay for chapter {chapter_number}"}), 500
+
 
 @app.route("/generate_fun_facts", methods=["POST"])
 async def generate_fun_facts():

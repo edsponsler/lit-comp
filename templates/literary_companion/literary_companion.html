@@ -53,20 +53,21 @@
             justify-content: center;
             padding: 0.5rem;
         }
-        #fun-fact-toggle {
+        .control-button {
             padding: 0.8rem 1.5rem;
             font-size: 1rem;
             cursor: pointer;
             border: none;
             border-radius: 5px;
-            background-color: #007bff;
+            background-color: #6c757d; /* A neutral gray */
             color: white;
             transition: background-color 0.3s;
+            margin: 0 5px;
         }
-        #fun-fact-toggle:hover {
-            background-color: #0056b3;
+        .control-button:hover:not(:disabled) {
+            background-color: #5a6268;
         }
-        #fun-fact-toggle:disabled {
+        .control-button:disabled {
             background-color: #ccc;
             cursor: not-allowed;
         }
@@ -109,7 +110,8 @@
     </div>
 
     <div class="controls">
-        <button id="fun-fact-toggle">Show Fun Facts</button>
+        <button id="fun-fact-toggle" class="control-button">Show Fun Facts</button>
+        <button id="screenplay-toggle" class="control-button">Show Screenplay</button>
     </div>
 
     <div id="progress-indicator">Chapter 1, Paragraph 1</div>
@@ -119,20 +121,24 @@
         const METADATA_API_URL = "/api/get_book_metadata";
         const CHAPTER_API_URL = "/api/get_book_chapter";
         const FUN_FACTS_API_URL = "/generate_fun_facts";
+        const SCREENPLAY_API_URL = "/api/get_screenplay";
 
         // --- DOM ELEMENTS ---
         const originalPane = document.getElementById('original-text');
         const dynamicPane = document.getElementById('dynamic-content');
         let dynamicPaneTitle = dynamicPane.querySelector('h2');
         const funFactButton = document.getElementById('fun-fact-toggle');
+        const screenplayButton = document.getElementById('screenplay-toggle');
         const progressIndicator = document.getElementById('progress-indicator');
 
         // --- STATE MANAGEMENT ---
         let paragraphsMetadata = [];
         let paragraphsData = [];
         let isShowingFunFacts = false;
+        let isShowingScreenplay = false;
         let lastVisibleParagraphId = null;
         let funFactsCache = {};
+        let screenplayCache = {};
         let currentChapterNumber = 0;
         let nextChapterToLoad = 1;
         let isLoading = false;
@@ -147,6 +153,7 @@
         // 1. INITIALIZE PAGE
         async function initializePage() {
             funFactButton.disabled = true;
+            screenplayButton.disabled = true;
             funFactButton.textContent = "Loading Novel...";
             try {
                 setupIntersectionObserver();
@@ -154,6 +161,7 @@
                 await loadNextChapter();
                 enableScrollSync();
                 funFactButton.disabled = false;
+                screenplayButton.disabled = false;
                 funFactButton.textContent = "Show Fun Facts";
             } catch (error) {
                 console.error("Initialization Error:", error);
@@ -283,7 +291,14 @@
                 await renderTranslationView();
                 isShowingFunFacts = false;
                 funFactButton.textContent = "Show Fun Facts";
+                screenplayButton.disabled = false;
+                enableScrollSync();
             } else {
+                if(isShowingScreenplay) {
+                    await renderTranslationView();
+                    isShowingScreenplay = false;
+                    screenplayButton.textContent = "Show Screenplay";
+                }
                 const currentParagraph = paragraphsData.find(p => p.paragraph_id == lastVisibleParagraphId);
                 const chapterNumber = currentParagraph ? currentParagraph.chapter_number : nextChapterToLoad - 1;
                 const cacheKey = `funfacts-ch-${chapterNumber}`;
@@ -320,12 +335,84 @@
                 }
                 isShowingFunFacts = true;
                 funFactButton.textContent = "Show Modern English";
+                screenplayButton.disabled = true;
             }
-
             originalPane.scrollTop = scrollPos;
             dynamicPane.scrollTop = scrollPos;
-            setTimeout(enableScrollSync, 100);
         });
+
+        screenplayButton.addEventListener('click', async () => {
+            const scrollPos = originalPane.scrollTop;
+            disableScrollSync();
+
+            if (isShowingScreenplay) {
+                await renderTranslationView();
+                isShowingScreenplay = false;
+                screenplayButton.textContent = "Show Screenplay";
+                funFactButton.disabled = false;
+                enableScrollSync();
+            } else {
+                if(isShowingFunFacts) {
+                    await renderTranslationView();
+                    isShowingFunFacts = false;
+                    funFactButton.textContent = "Show Fun Facts";
+                }
+                const currentParagraph = paragraphsData.find(p => p.paragraph_id == lastVisibleParagraphId);
+                const chapterNumber = currentParagraph ? currentParagraph.chapter_number : nextChapterToLoad - 1;
+                const cacheKey = `screenplay-ch-${chapterNumber}`;
+
+                if (screenplayCache[cacheKey]) {
+                    await renderScreenplayView(screenplayCache[cacheKey]);
+                } else {
+                    screenplayButton.disabled = true;
+                    screenplayButton.textContent = "Loading...";
+                    try {
+                        const response = await fetch(SCREENPLAY_API_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                chapter_number: chapterNumber,
+                                book_name: bookName
+                            })
+                        });
+
+                        if (response.status === 404) {
+                            const notFoundMessage = { screenplay: "Screenplay has not been generated yet." };
+                            screenplayCache[cacheKey] = notFoundMessage;
+                            await renderScreenplayView(notFoundMessage);
+                        } else if (!response.ok) {
+                            throw new Error(`API Error: ${response.statusText}`);
+                        } else {
+                            const screenplay = await response.json();
+                            screenplayCache[cacheKey] = screenplay;
+                            await renderScreenplayView(screenplay);
+                        }
+                    } catch (error) {
+                        console.error("Error loading screenplay:", error);
+                        alert("Could not load screenplay. See console for details.");
+                    } finally {
+                        screenplayButton.disabled = false;
+                    }
+                }
+                isShowingScreenplay = true;
+                screenplayButton.textContent = "Show Modern English";
+                funFactButton.disabled = true;
+            }
+            originalPane.scrollTop = scrollPos;
+            dynamicPane.scrollTop = scrollPos;
+        });
+
+        async function renderScreenplayView(screenplay) {
+            dynamicPaneTitle.textContent = "Screenplay";
+            const contentArea = dynamicPane;
+            contentArea.innerHTML = '<h2>Screenplay</h2>';
+
+            const screenplayText = document.createElement('pre');
+            screenplayText.style.whiteSpace = 'pre-wrap'; // Allows text to wrap
+            screenplayText.style.wordWrap = 'break-word'; // Breaks long words
+            screenplayText.textContent = screenplay.screenplay;
+            contentArea.appendChild(screenplayText);
+        }
 
         async function renderFunFactsView(facts) {
             dynamicPaneTitle.textContent = "Fun Facts";
