@@ -105,23 +105,27 @@ async def main(bucket: str, file: str, chapters: str, use_mocks: bool):
     if not final_screenplay:
         final_screenplay = final_response
 
-    print("--- Final Screenplay ---")
-    print(final_screenplay)
+    # --- New logic to handle per-chapter screenplays ---
+    chapter_screenplays = final_session.state.get("chapter_screenplays")
 
-    if final_screenplay and not use_mocks and "No screenplay was generated" not in final_screenplay:
-        # Construct the output path, e.g., "pg2701-moby-dick-all/screenplay_chap_1-3.md"
+    if chapter_screenplays and isinstance(chapter_screenplays, dict):
+        print(f"\n--- Generated {len(chapter_screenplays)} Chapter Screenplay(s) ---")
         folder_name = file.replace('.txt', '')
+        
+        for chapter_num, screenplay_text in sorted(chapter_screenplays.items()):
+            print(f"\n--- Chapter {chapter_num} Screenplay ---")
+            # Print a snippet of the screenplay for verification
+            print(screenplay_text[:500] + "..." if len(screenplay_text) > 500 else screenplay_text)
 
-        # Create a descriptive filename based on the chapter range.
-        match = re.search(r'(\d+)\s+through\s+(\d+)', chapters, re.IGNORECASE)
-        # We can be confident `match` exists because the script exits earlier if the format is invalid.
-        start_chap, end_chap = match.group(1), match.group(2)
-        if start_chap == end_chap:
-            output_filename = f"chapter_{start_chap}_screenplay.md"
-        else:
-            output_filename = f"chapters_{start_chap}-{end_chap}_screenplay.md"
-        output_path = f"{folder_name}/{output_filename}"
-        save_screenplay_to_gcs(bucket, output_path, final_screenplay)
+            if not use_mocks:
+                output_filename = f"chapter_{chapter_num}_screenplay.md"
+                output_path = f"{folder_name}/{output_filename}"
+                save_screenplay_to_gcs(bucket, output_path, screenplay_text)
+    else:
+        # Fallback for error or if no screenplays were generated
+        print("--- No chapter-specific screenplays found in state. ---")
+        print("--- Final Agent Response ---")
+        print(final_response)
 
 
 if __name__ == "__main__":

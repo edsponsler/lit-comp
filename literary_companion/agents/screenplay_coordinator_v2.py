@@ -75,8 +75,8 @@ creative_prompt_generator_agent = LlmAgent(
 generate prompts for an AI to create related assets.
 Generate one prompt for each of the following: 'music', 'sound_effects', 'concept_art', and 'narration'.
 The prompts should be detailed and evocative.
-Respond with a single JSON object containing the prompts.""",
-    generate_content_config=GenerateContentConfig(max_output_tokens=2048),
+Respond ONLY with a single JSON object containing the prompts. Do not add any other text, markdown, or explanations.""",
+    generate_content_config=GenerateContentConfig(max_output_tokens=4096),
     output_key="creative_prompts",
 )
 
@@ -154,7 +154,7 @@ class ScreenplayCoordinatorV2(BaseAgent):
 
         # --- Live Workflow ---
 
-        # Step 1: Generate Scenes, processing one chapter at a time
+        # Step 1: Group paragraphs by chapter
         paragraphs = ctx.session.state.get("paragraphs", [])
         if not paragraphs:
             logger.error(f"[{self.name}] No paragraphs found in initial state. Aborting.")
@@ -164,69 +164,72 @@ class ScreenplayCoordinatorV2(BaseAgent):
         for p in paragraphs:
             chapters[p["chapter_number"]].append(p["translated_text"])
 
-        all_scenes = []
+        final_screenplays_by_chapter = {}
+        # Loop through each chapter to generate a separate screenplay
         for chapter_num in sorted(chapters.keys()):
-            logger.info(f"[{self.name}] Processing Chapter {chapter_num}...")
+            logger.info(f"[{self.name}] --- Starting screenplay for Chapter {chapter_num} ---")
+
+            # --- Generate Scenes for the current chapter ---
             chapter_text = "\n\n".join(chapters[chapter_num])
-            temp_ctx = ctx.model_copy(update={"session": ctx.session.model_copy(update={"state": {"novel_text": chapter_text}})})
+            scene_gen_ctx = ctx.model_copy(update={"session": ctx.session.model_copy(update={"state": {"novel_text": chapter_text}})})
             
-            async for event in self.scene_generator.run_async(temp_ctx):
+            async for event in self.scene_generator.run_async(scene_gen_ctx):
                 yield event
             
-            # The result from the sub-agent is written to the main session state.
-            # We must retrieve it from there, not the temporary context.
-            # We use .pop() to remove the key, preventing state collisions on the next loop iteration.
             scenes_text = ctx.session.state.pop("scenes", None)
             scenes_for_chapter = _clean_and_parse_json(scenes_text, f"{self.name}-Chap{chapter_num}")
-            if scenes_for_chapter:
-                all_scenes.extend(scenes_for_chapter)
-                logger.info(f"[{self.name}] Generated {len(scenes_for_chapter)} scenes for Chapter {chapter_num}.")
 
-        if not all_scenes:
-            logger.error(f"[{self.name}] Failed to generate or parse scenes. Aborting.")
-            return
+            if not scenes_for_chapter:
+                logger.warning(f"[{self.name}] No scenes generated for Chapter {chapter_num}. Skipping.")
+                continue
+            
+            logger.info(f"[{self.name}] Generated {len(scenes_for_chapter)} scenes for Chapter {chapter_num}.")
 
-        logger.info(f"[{self.name}] Generated a total of {len(all_scenes)} scenes.")
+            # --- Generate Creative Prompts for this chapter's scenes ---
+            scenes_with_prompts = []
+            for i, scene in enumerate(scenes_for_chapter):
+                logger.info(f"[{self.name}] Generating prompts for scene {i+1}/{len(scenes_for_chapter)} (Chapter {chapter_num})...")
+                prompt_gen_state = {"action": scene.get("action", ""), "dialogue": scene.get("dialogue", "")}
+                prompt_gen_ctx = ctx.model_copy(update={"session": ctx.session.model_copy(update={"state": prompt_gen_state})})
 
-        # Step 2: Generate Creative Prompts for each scene
-        scenes_with_prompts = []
-        for i, scene in enumerate(all_scenes):
-            logger.info(f"[{self.name}] Generating prompts for scene {i+1}/{len(all_scenes)}...")
-            # Create a temporary context for the prompt generator
-            # This isolates the state for each call
-            temp_state = {
-                "action": scene.get("action", ""),
-                "dialogue": scene.get("dialogue", "")
-            }
-            # Create a new session object with the temporary state
-            temp_session = ctx.session.model_copy(update={"state": temp_state})
-            # Create a copy of the invocation context, replacing its session
-            temp_ctx = ctx.model_copy(update={"session": temp_session})
+                async for event in self.creative_prompt_generator.run_async(prompt_gen_ctx):
+                    yield event
 
-            async for event in self.creative_prompt_generator.run_async(temp_ctx):
+                prompts_text = ctx.session.state.pop("creative_prompts", None)
+                creative_prompts = _clean_and_parse_json(prompts_text, f"{self.name}-Chap{chapter_num}-Scene{i+1}")
+                
+                if not creative_prompts:
+                    creative_prompts = {"error": "Failed to generate or parse creative prompts."}
+                scene["creative_prompts"] = creative_prompts
+                scenes_with_prompts.append(scene)
+            
+            logger.info(f"[{self.name}] Finished generating prompts for Chapter {chapter_num}.")
+
+            # --- Assemble the Final Screenplay for this chapter ---
+            logger.info(f"[{self.name}] Assembling screenplay for Chapter {chapter_num}...")
+            assembler_state = {"scenes_with_prompts": scenes_with_prompts}
+            assembler_ctx = ctx.model_copy(update={"session": ctx.session.model_copy(update={"state": assembler_state})})
+
+            async for event in self.screenplay_assembler.run_async(assembler_ctx):
                 yield event
 
-            # The result is in the main session state. Pop it to avoid state collision.
-            prompts_text = ctx.session.state.pop("creative_prompts", None)
-            creative_prompts = _clean_and_parse_json(
-                prompts_text,
-                f"{self.name}-Scene{i+1}"
-            )
+            chapter_screenplay = ctx.session.state.pop("final_screenplay", None)
+            if chapter_screenplay:
+                final_screenplays_by_chapter[chapter_num] = chapter_screenplay
+                logger.info(f"[{self.name}] Successfully assembled screenplay for Chapter {chapter_num}.")
+            else:
+                logger.warning(f"[{self.name}] Failed to assemble screenplay for Chapter {chapter_num}.")
 
-            if not creative_prompts:
-                creative_prompts = {"error": "Failed to generate or parse creative prompts."}
-            scene["creative_prompts"] = creative_prompts
-            scenes_with_prompts.append(scene)
+        # After the loop, save the dictionary of all screenplays to the main state
+        ctx.session.state["chapter_screenplays"] = final_screenplays_by_chapter
+        logger.info(f"[{self.name}] Workflow finished. All chapter screenplays are in 'chapter_screenplays' state variable.")
 
-        ctx.session.state["scenes_with_prompts"] = scenes_with_prompts
-        logger.info(f"[{self.name}] Finished generating all creative prompts.")
-
-        # Step 3: Assemble the Final Screenplay
-        logger.info(f"[{self.name}] Running ScreenplayAssembler...")
-        async for event in self.screenplay_assembler.run_async(ctx):
-            yield event
-
-        logger.info(f"[{self.name}] Workflow finished. Final screenplay is in 'final_screenplay' state variable.")
+        # Yield a final event to signal completion and commit the state
+        yield Event(
+            author=self.name,
+            content=Content(parts=[Part(text="All chapter screenplays generated.")]),
+            actions=EventActions(state_delta={"chapter_screenplays": final_screenplays_by_chapter}),
+        )
 
 # --- 3. Create a default instance of the coordinator ---
 screenplay_coordinator_v2 = ScreenplayCoordinatorV2()
