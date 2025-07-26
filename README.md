@@ -109,6 +109,19 @@ Follow these steps to get the Literary Companion running on your local machine.
 
 4.  **Open in Browser:** Navigate to `http://127.0.0.1:5001` to start reading.
 
+### Utility Scripts
+
+#### Filtering a Prepared Book
+
+After preparing a book, you may want to create a smaller version for testing or demos. The `scripts/filter_prepared_book.py` script allows you to do this.
+
+-   **Purpose**: Creates a new `_prepared.json` file containing only chapters up to a specified number.
+-   **Usage**:
+    ```bash
+    python scripts/filter_prepared_book.py path/to/your_book_prepared.json 10
+    ```
+    This command will create a new file (e.g., `your_book_prepared_chap_1-10.json`) in the same directory, containing only the content from chapters 1 through 10.
+
 ## How to Contribute
 
 We welcome contributions! Here are a few ideas to get you started:
